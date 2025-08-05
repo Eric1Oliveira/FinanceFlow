@@ -107,9 +107,123 @@
         }
         }
 
-        body:not(.login-active) #loginModal,
-        body:not(.login-active) #registerModal {
-            display: none !important;
+        #loginModal, 
+        #registerModal {
+            min-height: 100vh;
+            min-width: 100vw;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1e293b 0%, #2563eb 100%) !important;
+            background-size: cover;
+            background-repeat: no-repeat;
+            z-index: 1000;
+            animation: fadeInBg 0.7s;
+            display: none; /* só aparece com .flex */
+        }
+        @keyframes fadeInBg {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+       #loginModal.flex, #registerModal.flex {
+            display: flex !important;
+        }
+
+        /* Glass effect no card */
+        .login-glass {
+            backdrop-filter: blur(18px) saturate(120%);
+            background: rgba(255,255,255,0.92) !important;
+            border-radius: 1.25rem;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
+            border: 2px solid #2563eb !important;
+            transition: box-shadow 0.3s;
+            color: #1e293b !important;
+        }
+        .dark .login-glass {
+            background: rgba(30,41,59,0.98) !important; /* vidro mais escuro e opaco */
+            border: 2px solid #60a5fa !important; /* borda azul clara */
+            color: #f9fafb !important;
+        }
+
+        /* Inputs: borda e foco mais visíveis */
+        #loginModal input, #loginModal select, #loginModal textarea,
+        #registerModal input, #registerModal select, #registerModal textarea {
+            border: 2px solid #2563eb !important;
+            background-color: #fff !important;
+            color: #1e293b !important;
+        }
+        #loginModal input:focus, #loginModal select:focus, #loginModal textarea:focus,
+        #registerModal input:focus, #registerModal select:focus, #registerModal textarea:focus {
+            border-color: #1e293b !important;
+            background-color: #f1f5f9 !important;
+            color: #1e293b !important;
+        }
+        .dark #loginModal input, .dark #loginModal select, .dark #loginModal textarea,
+        .dark #registerModal input, .dark #registerModal select, .dark #registerModal textarea {
+            border: 2px solid #60a5fa !important;
+            background-color: #1e293b !important;
+            color: #f9fafb !important;
+        }
+        .dark #loginModal input:focus, .dark #loginModal select:focus, .dark #loginModal textarea:focus,
+        .dark #registerModal input:focus, .dark #registerModal select:focus, .dark #registerModal textarea:focus {
+            border-color: #f9fafb !important;
+            background-color: #334155 !important;
+            color: #f9fafb !important;
+        }
+
+        /* Links de ação: azul forte */
+        .text-primary-600, .dark .text-primary-600 {
+            color: #2563eb !important;
+            font-weight: bold;
+        }
+        .text-primary-600:hover, .dark .text-primary-600:hover {
+            color: #1e40af !important;
+            text-decoration: underline;
+        }
+
+        /* Erros: vermelho forte */
+        .text-red-500, .dark .text-red-500 {
+            color: #dc2626 !important;
+            font-weight: bold;
+            background: #fff0f0 !important;
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        /* Cards e tabelas: fundo mais branco/escuro e borda mais forte */
+        .custom-card.bg-white {
+            background-color: #fff !important;
+            border: 2px solid #1e293b !important;
+        }
+        .dark .custom-card.bg-gray-800 {
+            background-color: #1e293b !important;
+            border: 2px solid #60a5fa !important;
+        }
+
+        /* Textos principais só em cards customizados */
+        .custom-card .text-gray-900, .dark .custom-card .text-gray-100 {
+            color: #1e293b !important;
+            font-weight: bold;
+        }
+        .dark .custom-card .text-gray-100 {
+            color: #f9fafb !important;
+        }
+
+        /* Textos secundários só em cards customizados */
+        .custom-card .text-gray-600, .dark .custom-card .text-gray-400 {
+            color: #334155 !important;
+        }
+        .dark .custom-card .text-gray-400 {
+            color: #cbd5e1 !important;
+        }
+
+        /* Animação de entrada */
+        @keyframes popIn {
+            from { transform: scale(0.95) translateY(40px); opacity: 0; }
+            to { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .login-glass {
+            animation: popIn 0.5s cubic-bezier(.4,2,.3,1) 0.1s both;
         }
 
         body.login-active #appRoot {
@@ -234,15 +348,15 @@
         }
         .animate-bounce-in {
             animation: bounceIn 0.5s;
-}
+        }
 
     </style>
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-100 dark:text-gray-900 transition-colors duration-300 login-active">
     
     
-    <div id="loginModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 ">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-8 w-full max-w-sm">
+    <div id="loginModal" class="fixed inset-0 flex items-center justify-center z-50">
+        <div class="login-glass w-full max-w-sm p-8">
             <h2 class="text-xl font-bold mb-4 text-gray-900 dark:text-gray-100">Entrar</h2>
             <form id="loginForm" class="space-y-4">
                 <input type="email" id="loginEmail" placeholder="E-mail" required class="w-full px-3 py-2 border rounded" />
@@ -257,8 +371,8 @@
     </div>
 
     <!-- Modal de Cadastro -->
-    <div id="registerModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 hidden">
-        <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-8 w-full max-w-sm">
+    <div id="registerModal" class="fixed inset-0 flex items-center justify-center z-50 hidden">
+        <div class="login-glass w-full max-w-sm p-8">
             <h2 class="text-xl font-bold mb-4 text-gray-900 dark:text-gray-100">Criar Conta</h2>
             <form id="registerForm" class="space-y-4">
                 <input type="text" id="registerName" placeholder="Nome de usuário" required class="w-full px-3 py-2 border rounded" />
@@ -269,7 +383,7 @@
             </form>
             <div id="registerError" class="text-red-500 mt-2 text-sm hidden"></div>
             <div class="mt-4 text-center">
-                <button id="backToLoginBtn" class="text-primary-600 hover:underline">Já tenho conta</button>
+                <button id="backToLoginBtn" type="button" class="text-primary-600 hover:underline">Já tenho conta</button>
             </div>
         </div>
     </div>
@@ -736,15 +850,9 @@
                     this.renderBudgets();
                 });
 
-                // Carrega dados do Supabase (não usa dados default!)
-                this.fetchBudgetsFromSupabase().then(budgets => {
-                    this.budgets = budgets;
-                    this.renderBudgets();
-                });
-
                 this.fetchTransactionsFromSupabase().then(transactions => {
                     this.transactions = transactions;
-                    this.renderCurrentSection();
+                    this.renderDashboard();
                 });
 
                 this.fetchGoalsFromSupabase().then(goals => {
@@ -839,25 +947,28 @@
                 if (!user) return 0;
                 const { data, error } = await supabase
                     .from('balances')
-                    .select('amount')
+                    .select('amount,updated_at')
                     .eq('user_id', user.id)
                     .order('updated_at', { ascending: false })
                     .limit(1);
                 if (error || !data || !data[0]) return 0;
+                this.manualBalanceDate = data[0].updated_at; // Carrega a data da última edição
                 return parseFloat(data[0].amount);
             }
 
             async saveBalanceToSupabase(amount) {
                 const user = (await supabase.auth.getUser()).data.user;
                 if (!user) return false;
+                const updatedAt = new Date().toISOString();
                 const { error } = await supabase
                     .from('balances')
-                    .upsert([{ user_id: user.id, amount, updated_at: new Date().toISOString() }], { onConflict: ['user_id'] });
+                    .upsert([{ user_id: user.id, amount, updated_at: updatedAt }], { onConflict: ['user_id'] });
                 if (error) {
                     this.showNotification('Erro ao salvar saldo', 'error');
                     return false;
                 }
                 this.manualBalance = amount;
+                this.manualBalanceDate = updatedAt; // Salva a data da edição
                 return true;
             }
 
@@ -971,22 +1082,28 @@
                 this.setupSidebarProfile();
             }
 
-            categories = [];
-
             async fetchCategoriesFromSupabase() {
                 const user = (await supabase.auth.getUser()).data.user;
                 if (!user) return [];
                 const { data, error } = await supabase
                     .from('categories')
-                    .select('*')
+                    .select('id,name,icon,description,user_id')
                     .eq('user_id', user.id)
                     .order('created_at', { ascending: false });
-                return data || [];
+                // Adiciona o campo fixed só no JS
+                const fixedNames = ['Salário', 'Lazer', 'Casa'];
+                return (data || []).map(cat => ({
+                    ...cat,
+                    fixed: fixedNames.includes(cat.name)
+                }));
             }
-            
+
             async addCategoryToSupabase(category) {
                 const user = (await supabase.auth.getUser()).data.user;
                 if (!user) return false;
+
+                // Remove o campo fixed antes de enviar
+                const { fixed, ...categoryData } = category;
 
                 // Verifica se já existe categoria com mesmo nome para o usuário
                 const { data: existing, error: fetchError } = await supabase
@@ -1003,7 +1120,7 @@
 
                 const { data, error } = await supabase
                     .from('categories')
-                    .insert([{ ...category, user_id: user.id }])
+                    .insert([{ ...categoryData, user_id: user.id }])
                     .select();
                 if (error) {
                     this.showNotification('Erro ao criar categoria.', 'error');
@@ -1011,6 +1128,8 @@
                 }
                 return data[0];
             }
+
+            categories = [];
 
             async updateCategoryInSupabase(category) {
                 const { id, ...catData } = category;
@@ -1030,20 +1149,34 @@
             }
 
             async renderCategories() {
-                // Garante categorias padrão se não houver nenhuma
+                // Categorias fixas
+                const fixedCategories = [
+                    { name: 'Salário', icon: '💼', description: 'Recebimentos', fixed: true },
+                    { name: 'Lazer', icon: '🎉', description: 'Diversão e lazer', fixed: true },
+                    { name: 'Casa', icon: '🏠', description: 'Despesas com moradia', fixed: true }
+                ];
+
                 let categories = await this.fetchCategoriesFromSupabase();
-                if (!categories || categories.length === 0) {
-                    // Adiciona padrões se não houver no Supabase
-                    const defaults = [
-                        { name: 'Salário', icon: '💼', description: 'Recebimentos', },
-                        { name: 'Lazer', icon: '🎉', description: 'Diversão e lazer', },
-                        { name: 'Casa', icon: '🏠', description: 'Despesas com moradia', }
-                    ];
-                    for (const cat of defaults) {
-                        await this.addCategoryToSupabase(cat);
+
+                // Garante que as fixas existem e marca como fixed
+                for (const fixed of fixedCategories) {
+                    let found = categories.find(cat => cat.name === fixed.name);
+                    if (!found) {
+                        await this.addCategoryToSupabase({ ...fixed });
+                        categories = await this.fetchCategoriesFromSupabase();
+                        found = categories.find(cat => cat.name === fixed.name);
                     }
-                    categories = await this.fetchCategoriesFromSupabase();
+                    if (found) found.fixed = true;
                 }
+
+                // Marca as fixas
+                categories = categories.map(cat => {
+                    if (fixedCategories.some(f => f.name === cat.name)) {
+                        return { ...cat, fixed: true };
+                    }
+                    return cat;
+                });
+
                 this.categories = categories;
 
                 const grid = document.getElementById('categoriesGrid');
@@ -1051,29 +1184,30 @@
 
                 // Card de adicionar categoria
                 const addCard = `
-                <div onclick="app.openCategoryModal()" class="cursor-pointer bg-white dark:bg-gray-800 border-2 border-dashed border-primary-600 flex flex-col items-center justify-center rounded-xl h-40 transition hover:bg-primary-50 dark:hover:bg-primary-900 hover:border-primary-700">
-                    <div class="text-4xl text-primary-600 mb-2">＋</div>
-                    <div class="text-sm font-medium text-primary-700 dark:text-primary-300">Nova Categoria</div>
-                </div>
-                `;
-
-                // Cards das categorias
-                const catCards = categories.map(cat => `
-                <div class="group bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center h-40 transition-all duration-300 relative">
-                    <div class="text-4xl mb-2">${cat.icon || '📦'}</div>
-                    <div class="font-semibold text-gray-900 dark:text-gray-100 mb-1">${cat.name}</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400 mb-2 text-center">${cat.description || ''}</div>
-                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2">
-                    <button onclick="event.stopPropagation();app.openEditCategoryModal(${cat.id})" class="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900 transition"><svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 11l6 6M3 21h6v-6l9-9a2.828 2.828 0 10-4-4l-9 9z"></path></svg></button>
-                    <button onclick="event.stopPropagation();app.deleteCategory(${cat.id})" class="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900 transition"><svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                    <div onclick="app.openCategoryModal()" class="cursor-pointer bg-white dark:bg-gray-800 border-2 border-dashed border-primary-600 flex flex-col items-center justify-center rounded-xl h-40 transition hover:bg-primary-50 dark:hover:bg-primary-900 hover:border-primary-700">
+                        <div class="text-4xl text-primary-600 mb-2">＋</div>
+                        <div class="text-sm font-medium text-primary-700 dark:text-primary-300">Nova Categoria</div>
                     </div>
-                </div>
-                `).join('');
+                    `;
 
-                grid.innerHTML = addCard + catCards;
-            }
+                    // Cards das categorias
+                    const catCards = categories.map(cat => `
+                    <div class="group bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center h-40 transition-all duration-300 relative">
+                        <div class="text-4xl mb-2">${cat.icon || '📦'}</div>
+                        <div class="font-semibold text-gray-900 dark:text-gray-100 mb-1">${cat.name}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mb-2 text-center">${cat.description || ''}</div>
+                        ${cat.fixed ? '' : `
+                        <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2">
+                            <button onclick="event.stopPropagation();app.openEditCategoryModal(${cat.id})" class="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900 transition"><svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 11l6 6M3 21h6v-6l9-9a2.828 2.828 0 10-4-4l-9 9z"></path></svg></button>
+                            <button onclick="event.stopPropagation();app.deleteCategory(${cat.id})" class="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900 transition"><svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                        </div>
+                        `}
+                    </div>
+                    `).join('');
 
-            // ...dentro da classe FinanceApp...
+                    grid.innerHTML = addCard + catCards;
+                }
+
             async openCategoryModal(category = null) {
                 const isEdit = !!category;
                 const modalId = 'categoryModal';
@@ -1122,29 +1256,41 @@
                     <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-sm w-full mx-4 p-6 animate-bounce-in">
                         <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">${isEdit ? 'Editar' : 'Nova'} Categoria</h3>
                         <form id="categoryForm" class="space-y-4">
-                            <input type="text" name="name" required maxlength="30" placeholder="Nome" class="w-full px-3 py-2 border rounded" value="${category?.name || ''}" />
+                            <input type="text" name="name" required maxlength="30" placeholder="Nome" 
+                                class="w-full px-3 py-2 border rounded text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700" 
+                                value="${category?.name || ''}" />
                             <input type="hidden" name="icon" value="${selectedIcon}">
                             <div class="mb-2">
-                                <input type="text" id="iconSearch" placeholder="Buscar ícone..." class="w-full px-3 py-2 border rounded mb-3" />
+                                <input type="text" id="iconSearch" placeholder="Buscar ícone..." 
+                                    class="w-full px-3 py-2 border rounded mb-3 text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700" />
                             </div>
                             <div id="iconCatalog" class="space-y-4 max-h-48 overflow-y-auto pr-2">
                                 ${iconGroups.map(group => `
                                     <div>
-                                        <div class="font-semibold text-xs text-gray-500 mb-1">${group.title}</div>
+                                        <div class="font-semibold text-xs mb-1 text-gray-700 dark:text-gray-200">${group.title}</div>
                                         <div class="flex flex-wrap gap-2">
                                             ${group.icons.map(icon => `
                                                 <button type="button" class="icon-btn text-2xl rounded-full border-2 transition
                                                     ${selectedIcon === icon ? 'border-primary-600 bg-primary-50 dark:bg-primary-900' : 'border-transparent'}
+                                                    text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700"
                                                 ">${icon}</button>
                                             `).join('')}
                                         </div>
                                     </div>
                                 `).join('')}
                             </div>
-                            <input type="text" name="description" maxlength="100" placeholder="Descrição" class="w-full px-3 py-2 border rounded" value="${category?.description || ''}" />
+                            <input type="text" name="description" maxlength="100" placeholder="Descrição" 
+                                class="w-full px-3 py-2 border rounded text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700" 
+                                value="${category?.description || ''}" />
                             <div class="flex justify-end space-x-3 pt-4">
-                                <button type="button" onclick="app.closeModal('${modalId}')" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border rounded hover:bg-gray-50 dark:hover:bg-gray-600">Cancelar</button>
-                                <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700">Salvar</button>
+                                <button type="button" onclick="app.closeModal('${modalId}')" 
+                                    class="px-4 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 bg-white dark:bg-gray-700 border rounded hover:bg-gray-50 dark:hover:bg-gray-600">
+                                    Cancelar
+                                </button>
+                                <button type="submit" 
+                                    class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700">
+                                    Salvar
+                                </button>
                             </div>
                         </form>
                     </div>
@@ -1211,12 +1357,97 @@
                 if (cat) this.openCategoryModal(cat);
             }
 
+            // Bloqueia edição/exclusão das fixas
             async deleteCategory(id) {
+                const cat = this.categories.find(c => c.id === id);
+                if (cat?.fixed) {
+                    this.showNotification('Esta categoria não pode ser excluída.', 'error');
+                    return;
+                }
+                // Verifica se há transações usando a categoria
+                const usedInTransactions = this.transactions.some(t => t.category == id);
+                if (usedInTransactions) {
+                    // Mostra modal de migração
+                    this.openCategoryMigrationModal(id);
+                    return;
+                }
                 if (confirm('Deseja excluir esta categoria?')) {
                     await this.deleteCategoryFromSupabase(id);
                     this.renderCategories();
                 }
             }
+
+            // Modal para migração de transações
+            openCategoryMigrationModal(categoryId) {
+                const modalId = 'categoryMigrationModal';
+                const modal = document.createElement('div');
+                modal.id = modalId;
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+
+                // Lista de categorias para migrar (exceto a atual e fixas)
+                const otherCategories = this.categories.filter(c => c.id !== categoryId);
+
+                modal.innerHTML = `
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-sm w-full mx-4 p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Migrar Transações</h3>
+                        <p class="mb-4 text-gray-700 dark:text-gray-300">
+                            Não é possível excluir esta categoria pois ela está sendo utilizada em transações.<br>
+                            Para excluir, migre todas as transações para outra categoria.
+                        </p>
+                        <form id="categoryMigrationForm" class="space-y-4">
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Nova Categoria</label>
+                            <select name="newCategory" required class="w-full px-3 py-2 border rounded">
+                                <option value="">Selecione a categoria</option>
+                                ${otherCategories.map(cat => `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`).join('')}
+                            </select>
+                            <div class="flex justify-end space-x-3 pt-4">
+                                <button type="button" onclick="app.closeModal('${modalId}')" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border rounded hover:bg-gray-50 dark:hover:bg-gray-600">Cancelar</button>
+                                <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded hover:bg-primary-700">Migrar e Excluir</button>
+                            </div>
+                        </form>
+                    </div>
+                `;
+                document.getElementById('modalsContainer').appendChild(modal);
+
+                modal.querySelector('#categoryMigrationForm').onsubmit = async (e) => {
+                    e.preventDefault();
+                    const newCategoryId = e.target.newCategory.value;
+                    if (!newCategoryId) return;
+                    // Atualiza todas as transações para nova categoria
+                    await this.migrateTransactionsCategory(categoryId, newCategoryId);
+                    // Exclui categoria antiga
+                    await this.deleteCategoryFromSupabase(categoryId);
+                    this.closeModal(modalId);
+                    this.renderCategories();
+                    this.renderCurrentSection();
+                    this.showNotification('Transações migradas e categoria excluída!', 'success');
+                };
+            }
+
+            // Função para migrar transações de uma categoria para outra
+            async migrateTransactionsCategory(oldCategoryId, newCategoryId) {
+                // Atualiza no Supabase
+                const { error } = await supabase
+                    .from('transactions')
+                    .update({ category: newCategoryId })
+                    .eq('category', oldCategoryId);
+                if (error) {
+                    this.showNotification('Erro ao migrar transações.', 'error');
+                    return false;
+                }
+                // Atualiza localmente
+                this.transactions = await this.fetchTransactionsFromSupabase();
+                return true;
+            }
+
+                openEditCategoryModal(id) {
+                    const cat = this.categories.find(c => c.id === id);
+                    if (cat?.fixed) {
+                        this.showNotification('Esta categoria não pode ser editada.', 'error');
+                        return;
+                    }
+                    if (cat) this.openCategoryModal(cat);
+                }
             
             // Theme Management
             initializeTheme() {
@@ -1352,11 +1583,6 @@
                 
                 // Window resize
                 window.addEventListener('resize', () => this.handleResize());
-
-                // ...dentro da classe FinanceApp...
-                document.getElementById('editBalanceBtn').addEventListener('click', () => {
-                    this.openEditBalanceModal();
-                });
 
                 const addCategoryBtn = document.getElementById('addCategoryBtn');
                 if (addCategoryBtn) {
@@ -1655,11 +1881,13 @@
             createTransactionModal(transaction = null) {
                 const isEdit = !!transaction;
                 const modalId = 'transactionModal';
-                
+
+                const selectedType = transaction?.type || 'income';
+
                 const modal = document.createElement('div');
                 modal.id = modalId;
                 modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 opacity-0 transition-opacity duration-300';
-                
+
                 modal.innerHTML = `
                     <div class="modal-content bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full mx-4 transform scale-95 transition-transform duration-300">
                         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -1670,20 +1898,31 @@
                         <form id="transactionForm" class="p-6 space-y-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo</label>
-                                <select name="type" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-                                    <option value="">Selecione o tipo</option>
-                                    <option value="income" ${transaction?.type === 'income' ? 'selected' : ''}>Receita</option>
-                                    <option value="expense" ${transaction?.type === 'expense' ? 'selected' : ''}>Despesa</option>
-                                </select>
+                                <div class="flex gap-4 mb-2">
+                                    <button type="button" id="btnIncome" class="flex-1 px-4 py-3 rounded-lg border-2 font-semibold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900 transition-all duration-200
+                                        ${selectedType === 'income' ? 'border-green-600 ring-2 ring-green-400' : 'border-gray-300 dark:border-gray-600'}">
+                                        <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                                        </svg>
+                                        Receita
+                                    </button>
+                                    <button type="button" id="btnExpense" class="flex-1 px-4 py-3 rounded-lg border-2 font-semibold text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900 transition-all duration-200
+                                        ${selectedType === 'expense' ? 'border-red-600 ring-2 ring-red-400' : 'border-gray-300 dark:border-gray-600'}">
+                                        <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"></path>
+                                        </svg>
+                                        Despesa
+                                    </button>
+                                </div>
+                                <input type="hidden" name="type" value="${selectedType}">
                                 <div class="error-message text-red-500 text-sm mt-1 hidden"></div>
                             </div>
-                            
+                            <!-- ...restante do formulário igual... -->
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Valor</label>
                                 <input type="number" name="amount" step="0.01" min="0.01" max="999999.99" value="${transaction?.amount || ''}" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="0,00">
                                 <div class="error-message text-red-500 text-sm mt-1 hidden"></div>
                             </div>
-                            
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Categoria</label>
                                 <select name="category" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
@@ -1695,19 +1934,16 @@
                                 </select>
                                 <div class="error-message text-red-500 text-sm mt-1 hidden"></div>
                             </div>
-                            
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data</label>
                                 <input type="date" name="date" value="${transaction?.date || new Date().toISOString().split('T')[0]}" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
                                 <div class="error-message text-red-500 text-sm mt-1 hidden"></div>
                             </div>
-                            
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Descrição</label>
                                 <input type="text" name="description" value="${transaction?.description || ''}" required maxlength="100" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="Descrição da transação">
                                 <div class="error-message text-red-500 text-sm mt-1 hidden"></div>
                             </div>
-                            
                             <div class="flex justify-end space-x-3 pt-4">
                                 <button type="button" onclick="app.closeModal('${modalId}')" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors">
                                     Cancelar
@@ -1721,16 +1957,34 @@
                 `;
 
                 setTimeout(() => {
+                    // Botões de tipo
+                    const btnIncome = modal.querySelector('#btnIncome');
+                    const btnExpense = modal.querySelector('#btnExpense');
+                    const typeInput = modal.querySelector('input[name="type"]');
+
+                    btnIncome.onclick = () => {
+                        btnIncome.classList.add('border-green-600', 'ring-2', 'ring-green-400');
+                        btnExpense.classList.remove('border-red-600', 'ring-2', 'ring-red-400');
+                        btnIncome.classList.remove('border-gray-300', 'dark:border-gray-600');
+                        btnExpense.classList.add('border-gray-300', 'dark:border-gray-600');
+                        typeInput.value = 'income';
+                    };
+                    btnExpense.onclick = () => {
+                        btnExpense.classList.add('border-red-600', 'ring-2', 'ring-red-400');
+                        btnIncome.classList.remove('border-green-600', 'ring-2', 'ring-green-400');
+                        btnExpense.classList.remove('border-gray-300', 'dark:border-gray-600');
+                        btnIncome.classList.add('border-gray-300', 'dark:border-gray-600');
+                        typeInput.value = 'expense';
+                    };
+
+                    // Categoria: Nova categoria
                     const categorySelect = modal.querySelector('select[name="category"]');
                     if (categorySelect) {
                         categorySelect.addEventListener('change', async (e) => {
                             if (e.target.value === '__new__') {
                                 this.closeModal('transactionModal');
-                                // Aguarda o usuário fechar o modal de categoria
                                 await new Promise(resolve => {
-                                    // Abre o modal e injeta um callback para reabrir o de transação
                                     this.openCategoryModal();
-                                    // Observa o fechamento do modal de categoria
                                     const observer = new MutationObserver(() => {
                                         if (!document.getElementById('categoryModal')) {
                                             observer.disconnect();
@@ -1739,26 +1993,23 @@
                                     });
                                     observer.observe(document.body, { childList: true, subtree: true });
                                 });
-                                // Atualiza categorias e reabre o modal de transação
                                 this.categories = await this.fetchCategoriesFromSupabase();
                                 this.openTransactionModal(transaction);
                             }
                         });
                     }
                 }, 100);
-                
-                // Add form submission handler
+
                 modal.querySelector('#transactionForm').addEventListener('submit', (e) => {
                     this.handleTransactionSubmit(e, transaction);
                 });
-                
-                // Close on backdrop click
+
                 modal.addEventListener('click', (e) => {
                     if (e.target === modal) {
                         this.closeModal(modalId);
                     }
                 });
-                
+
                 return modal;
             }
 
@@ -2066,6 +2317,12 @@
                 this.updateDashboardStats();
                 this.renderRecentTransactions();
                 this.renderCharts();
+
+                // Adiciona o event listener após renderizar o dashboard
+                const editBtn = document.getElementById('editBalanceBtn');
+                if (editBtn) {
+                    editBtn.onclick = () => this.openEditBalanceModal();
+                }
             }
             
             async updateDashboardStats() {
@@ -2099,18 +2356,29 @@
                 const prevBalance = prevIncome - prevExpenses;
 
                 // Saldo inicial manual (se não houver, é 0)
-                let saldoInicial = (this.manualBalance !== undefined && this.manualBalance !== null && !isNaN(this.manualBalance))
-                    ? this.manualBalance
-                    : 0;
-
-                // Saldo atual = saldo inicial + entradas - saídas
-                let currentBalance = saldoInicial + (totalIncome - totalExpenses);
+                let currentBalance = 0;
+                    if (this.manualBalance !== undefined && this.manualBalance !== null && !isNaN(this.manualBalance)) {
+                        // Soma/subtrai só transações feitas após a edição do saldo manual
+                        const manualDate = this.manualBalanceDate ? new Date(this.manualBalanceDate) : null;
+                        const afterManual = manualDate
+                            ? transactions.filter(t => new Date(t.date) > manualDate)
+                            : [];
+                        const incomeAfter = afterManual.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+                        const expenseAfter = afterManual.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+                        currentBalance = this.manualBalance + incomeAfter - expenseAfter;
+                    } else {
+                        // Nunca editou: saldo = receitas - despesas
+                        const totalIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0);
+                        const totalExpenses = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0);
+                        currentBalance = totalIncome - totalExpenses;
+                    }
 
                 // Função para calcular variação percentual
                 function percentChange(current, prev) {
                     if (prev === 0) return current === 0 ? 0 : 100;
                     return ((current - prev) / Math.abs(prev)) * 100;
                 }
+                
 
                 // Atualiza os valores
                 const elBalance = document.getElementById('currentBalance');
@@ -3534,15 +3802,15 @@
 
             // Alternar modais
             if (openRegisterBtn) openRegisterBtn.onclick = () => {
-                loginModal.style.display = 'none';
-                registerModal.style.display = 'flex';
+                loginModal.classList.remove('flex');
+                registerModal.classList.add('flex');
                 registerError.classList.add('hidden');
-                // Limpa campos do cadastro se quiser também
                 if (registerForm) registerForm.reset();
             };
-            if (backToLoginBtn) backToLoginBtn.onclick = () => {
-                registerModal.style.display = 'none';
-                loginModal.style.display = 'flex';
+            if (backToLoginBtn) backToLoginBtn.onclick = (e) => {
+                e.preventDefault();
+                registerModal.classList.remove('flex');
+                loginModal.classList.add('flex');
                 loginError.classList.add('hidden');
                 clearLoginFields();
             };
@@ -3582,8 +3850,8 @@
                         registerError.textContent = error.message;
                         registerError.classList.remove('hidden');
                     } else {
-                        registerModal.style.display = 'none';
-                        loginModal.style.display = 'flex';
+                        registerModal.classList.remove('flex');
+                        loginModal.classList.add('flex');
                         loginError.classList.add('hidden');
                         registerForm.reset();
                         clearLoginFields();
@@ -3605,7 +3873,7 @@
                         loginError.textContent = 'E-mail ou senha inválidos.';
                         loginError.classList.remove('hidden');
                     } else {
-                        loginModal.style.display = 'none';
+                        loginModal.classList.remove('flex');
                         document.body.classList.remove('login-active');
                         window.app = new FinanceApp();
                     }
@@ -3615,14 +3883,13 @@
             // Verifica se está logado
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                if (loginModal) loginModal.style.display = 'none';
-                if (registerModal) registerModal.style.display = 'none';
+                if (loginModal) loginModal.classList.remove('flex');
+                if (registerModal) registerModal.classList.remove('flex');
                 document.body.classList.remove('login-active');
-                // Só cria o app depois de logado!
                 window.app = new FinanceApp();
             } else {
-                if (loginModal) loginModal.style.display = 'flex';
-                if (registerModal) registerModal.style.display = 'none';
+                if (loginModal) loginModal.classList.add('flex');
+                if (registerModal) registerModal.classList.remove('flex');
                 document.body.classList.add('login-active');
                 clearLoginFields();
             }
