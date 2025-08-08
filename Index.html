@@ -74,6 +74,267 @@
         }
     </script>
     <style>
+        /* Tela de login/cadastro ocupa toda a tela com gradiente animado */
+        body.login-active {
+            min-height: 100vh;
+            background: linear-gradient(120deg, #3b82f6 0%, #10b981 100%);
+            animation: gradientMove 8s ease-in-out infinite alternate;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 100% 50%; }
+        }
+
+        /* Card centralizado, maior e com sombra */
+        #loginModal, #registerModal {
+            position: fixed !important;
+            inset: 0;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            background: linear-gradient(120deg, #1e293b 0%, #0ea5e9 100%);
+            backdrop-filter: blur(18px) brightness(0.96);
+            transition: background 0.4s;
+        }
+        #loginModal > div, #registerModal > div {
+            background: rgba(255,255,255,0.10);
+            border-radius: 2.2rem;
+            box-shadow: 0 24px 64px 0 rgba(16, 185, 129, 0.18), 0 8px 32px 0 rgba(30, 41, 59, 0.22);
+            padding: 3rem 2.2rem;
+            width: 100%;
+            max-width: 420px;
+            animation: bounceIn 0.7s cubic-bezier(.68,-0.55,.27,1.55);
+            border: 2px solid #0ea5e9;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+            backdrop-filter: blur(8px);
+        }
+        #loginModal h2, #registerModal h2 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            color: #1e293b;
+            letter-spacing: 1.5px;
+            margin-bottom: 1.3rem;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+            /* Removido qualquer text-shadow/neon */
+        }
+        #loginModal input, #registerModal input {
+            background: rgba(255,255,255,0.18);
+            border: 2px solid #0ea5e9;
+            border-radius: 1rem;
+            font-size: 1.08rem;
+            color: #1e293b;
+            margin-bottom: 0.7rem;
+            box-shadow: 0 2px 8px #0ea5e922;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+        }
+        #loginModal input:focus, #registerModal input:focus {
+            border-color: #10b981;
+            box-shadow: 0 0 0 2px #10b98188;
+        }
+        #loginModal button, #registerModal button {
+            background: linear-gradient(90deg, #0ea5e9 0%, #10b981 100%);
+            color: #fff;
+            font-weight: 700;
+            border-radius: 1rem;
+            box-shadow: 0 2px 8px #0ea5e922;
+            transition: background 0.2s, box-shadow 0.2s;
+            font-size: 1.08rem;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+        }
+        #loginModal button:hover, #registerModal button:hover {
+            background: linear-gradient(90deg, #10b981 0%, #0ea5e9 100%);
+            box-shadow: 0 4px 16px #10b98144;
+        }
+        #loginModal h2, #registerModal h2 {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #3b4a6b;
+            letter-spacing: 1px;
+            margin-bottom: 1.2rem;
+            text-shadow: 0 2px 12px #e0e7ff88;
+        }
+        #loginModal input, #registerModal input {
+            background: rgba(240,245,255,0.7);
+            border: 1.5px solid #c7d2fe;
+            border-radius: 1rem;
+            font-size: 1.08rem;
+            color: #3b4a6b;
+            margin-bottom: 0.7rem;
+            box-shadow: 0 2px 8px #e0e7ff22;
+        }
+        #loginModal button, #registerModal button {
+            background: linear-gradient(90deg, #6366f1 0%, #38bdf8 100%);
+            color: #fff;
+            font-weight: 600;
+            border-radius: 1rem;
+            box-shadow: 0 2px 8px #6366f122;
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        #loginModal button:hover, #registerModal button:hover {
+            background: linear-gradient(90deg, #38bdf8 0%, #6366f1 100%);
+            box-shadow: 0 4px 16px #6366f144;
+        }
+        .dark #loginModal > div, .dark #registerModal > div {
+            background: rgba(36, 42, 66, 0.95);
+            border: 1.5px solid #6366f1;
+            color: #e0e7ff;
+        }
+
+        /* Título destacado */
+        #loginModal h2, #registerModal h2 {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            color: #2563eb;
+        }
+        .dark #loginModal h2, .dark #registerModal h2 {
+            color: #60a5fa;
+        }
+
+        /* Inputs mais modernos */
+        #loginModal input, #registerModal input {
+            border-radius: 0.75rem;
+            border: 1.5px solid #e5e7eb;
+            padding: 0.75rem 1rem;
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            background: #f9fafb;
+            color: #222;
+            transition: border 0.2s;
+        }
+        .dark #loginModal input, .dark #registerModal input {
+            background: #374151;
+            color: #e5e7eb;
+            border: 1.5px solid #374151;
+        }
+        #loginModal input:focus, #registerModal input:focus {
+            border-color: #3b82f6;
+            outline: none;
+        }
+        .dark #loginModal input:focus, .dark #registerModal input:focus {
+            border-color: #60a5fa;
+        }
+
+        /* Botão principal destacado */
+        #loginModal button[type="submit"], #registerModal button[type="submit"] {
+            background: linear-gradient(90deg, #3b82f6 60%, #10b981 100%);
+            color: white;
+            font-weight: bold;
+            border-radius: 0.75rem;
+            padding: 0.75rem 0;
+            font-size: 1.1rem;
+            margin-top: 0.5rem;
+            box-shadow: 0 2px 8px rgba(59,130,246,0.08);
+            transition: background 0.2s, transform 0.2s;
+        }
+        #loginModal button[type="submit"]:hover, #registerModal button[type="submit"]:hover {
+            background: linear-gradient(90deg, #2563eb 60%, #059669 100%);
+            transform: scale(1.03);
+        }
+
+        /* Links de alternância */
+        #loginModal .mt-4 button, #registerModal .mt-4 button {
+            color: #2563eb;
+            font-weight: 500;
+            background: none;
+            border: none;
+            padding: 0.5rem 0;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        #loginModal .mt-4 button:hover, #registerModal .mt-4 button:hover {
+            color: #10b981;
+            text-decoration: underline;
+        }
+
+        /* Mensagem de erro */
+        #loginError, #registerError {
+            background: #fee2e2;
+            color: #b91c1c;
+            border-radius: 0.5rem;
+            padding: 0.5rem 1rem;
+            margin-top: 0.5rem;
+            text-align: center;
+            font-size: 0.95rem;
+            display: none;
+        }
+        #loginError:not(.hidden), #registerError:not(.hidden) {
+            display: block;
+        }
+
+        /* Tela de carregamento estilizada */
+        #loadingScreen {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            background: linear-gradient(120deg, #1e293b 0%, #0ea5e9 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            transition: opacity 0.5s;
+        }
+        #loadingScreen .loader {
+            width: 100px;
+            height: 100px;
+            border: 14px solid #0ea5e9;
+            border-top: 14px solid #10b981;
+            border-right: 14px solid #fff;
+            border-bottom: 14px solid #1e293b;
+            border-radius: 50%;
+            animation: spin 1.2s cubic-bezier(.68,-0.55,.27,1.55) infinite;
+            margin-bottom: 44px;
+            box-shadow: 0 0 48px #10b98144, 0 2px 32px #0ea5e922;
+            background: rgba(255,255,255,0.10);
+            backdrop-filter: blur(2px);
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg);}
+            100% { transform: rotate(360deg);}
+        }
+        #loadingScreen .loading-title {
+            font-size: 2.6rem;
+            font-weight: 900;
+            color: #1e293b;
+            margin-bottom: 18px;
+            letter-spacing: 2px;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+        }
+        #loadingScreen .loading-desc {
+            color: #0ea5e9;
+            font-size: 1.18rem;
+            text-align: center;
+            margin-bottom: 18px;
+            font-weight: 700;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+        }
+        #loadingScreen .loading-tips {
+            color: #fff;
+            font-size: 1.08rem;
+            text-align: center;
+            opacity: 0.92;
+            font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+        }
+        #loadingScreen.hide {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Responsivo */
+        @media (max-width: 500px) {
+            #loginModal > div, #registerModal > div {
+                padding: 1.2rem 0.5rem;
+                max-width: 98vw;
+            }
+            #loginModal h2, #registerModal h2 {
+                font-size: 1.3rem;
+            }
+        }
 
         @media (max-width: 768px) {
         header {
@@ -114,6 +375,15 @@
 
         body.login-active #appRoot {
             display: none !important;
+        }
+
+        body.login-active {
+            min-height: 100vh;
+            background: linear-gradient(120deg, #3b82f6 0%, #10b981 100%);
+            animation: gradientMove 8s ease-in-out infinite alternate;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         input:focus, 
@@ -240,8 +510,14 @@
 </head>
 <body class="bg-gray-50 dark:bg-gray-900 text-gray-100 dark:text-gray-900 transition-colors duration-300 login-active">
     
+    <div id="loadingScreen" style="display:none;">
+        <div class="loader"></div>
+        <div class="loading-title">FinanceFlow</div>
+        <div class="loading-desc">Carregando seus dados financeiros...</div>
+        <div class="loading-tips">Aguarde um instante enquanto buscamos suas informações seguras.</div>
+    </div>
     
-    <div id="loginModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50 ">
+    <div id="loginModal" class="fixed inset-0 flex items-center justify-center bg-black bg-opacity-60 z-50">
         <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-8 w-full max-w-sm">
             <h2 class="text-xl font-bold mb-4 text-gray-900 dark:text-gray-100">Entrar</h2>
             <form id="loginForm" class="space-y-4">
@@ -318,18 +594,19 @@
                         </svg>
                         <span>Metas</span>
                     </a>
-                    <a href="#" class="nav-link" data-section="reports">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                        </svg>
-                        <span>Relatórios</span>
-                    </a>
                     <a href="#" class="nav-link" data-section="categories">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
                         </svg>
                         <span>Categorias</span>
                     </a>
+                    <a href="#" class="nav-link" data-section="reports">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        <span>Relatórios</span>
+                    </a>
+                    
                 </nav>
                 <div class="mt-auto px-4 pb-6">
                     <div id="sidebarProfileBtn" class="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 transition relative group">
@@ -418,7 +695,7 @@
                                         <p id="currentBalance" class="text-2xl font-bold text-green-600 dark:text-green-400"></p>
                                         <button id="editBalanceBtn" class="ml-2 p-2 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900 transition" title="Editar saldo">
                                             <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 3.487a2.25 2.25 0 113.182 3.182l-11.25 11.25a2 2 0 01-.878.513l-4 1a1 1 0 001.212 1.212l1-4a2 2 0 01.513-.878l11.25-11.25z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 000-1.42l-2.34-2.34a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z" />
                                             </svg>
                                         </button>
                                     </div>
@@ -537,6 +814,9 @@
                                         <option value="income">Receita</option>
                                         <option value="expense">Despesa</option>
                                     </select>
+                                    <button id="clearAllTransactionsBtn" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition">
+                                        Limpar Todas
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -592,14 +872,11 @@
                         </div>
                     </div>
                 </section>
+
                 <section id="categories-section" class="hidden">
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-6">Categorias</h3>
-                    </div>
                     <div id="categoriesGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
                 </section>
                 
-
                 <!-- Settings Section -->
                 <section id="settings-section" class="hidden">
                     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -715,8 +992,40 @@
     <div id="modalsContainer"></div>
     
     <script>
+
+        // Função para mostrar/esconder tela de carregamento
+        function showLoadingScreen(show = true) {
+            const loading = document.getElementById('loadingScreen');
+            if (!loading) return;
+            if (show) {
+                loading.style.display = 'flex';
+                setTimeout(() => loading.classList.remove('hide'), 10);
+            } else {
+                loading.classList.add('hide');
+                setTimeout(() => loading.style.display = 'none', 500);
+            }
+        }
+        
         // Global Application State
         class FinanceApp {
+            
+            // Formata data para dd/mm/aaaa
+            formatDateBR(date) {
+                if (!date) return '';
+                let d = typeof date === 'string' ? new Date(date) : date;
+                if (isNaN(d)) return '';
+                let day = String(d.getDate()).padStart(2, '0');
+                let month = String(d.getMonth() + 1).padStart(2, '0');
+                let year = d.getFullYear();
+                return day + '/' + month + '/' + year;
+            }
+            // Converte dd/mm/aaaa para ISO
+            parseDateBR(str) {
+                if (!str) return '';
+                const [day, month, year] = str.split('/');
+                if (!day || !month || !year) return '';
+                return year + '-' + month.padStart(2, '0') + '-' + day.padStart(2, '0');
+            }
             constructor() {
                 this.currentLanguage = localStorage.getItem('language') || 'pt-BR';
                 this.currentTheme = localStorage.getItem('theme') || 'auto';
@@ -826,11 +1135,46 @@
                     e.preventDefault();
                     const amount = parseFloat(e.target.amount.value);
                     if (isNaN(amount)) return;
+                    // Se há transações, sempre mostra o modal de confirmação
+                    const temTransacoes = Array.isArray(this.transactions) && this.transactions.length > 0;
+                    if (temTransacoes) {
+                        this.closeModal(modalId);
+                        this.openConfirmClearTransactionsForBalanceModal(amount);
+                        return;
+                    }
+                    // Se não há transações, apenas salva
                     await this.saveBalanceToSupabase(amount);
                     this.closeModal(modalId);
                     this.renderDashboard();
                     this.showNotification('Saldo atualizado!', 'success');
                 });
+            }
+
+            async openConfirmClearTransactionsForBalanceModal(newBalance) {
+                const modalId = 'confirmClearTransactionsForBalanceModal';
+                if (document.getElementById(modalId)) return;
+                const modal = document.createElement('div');
+                modal.id = modalId;
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-sm w-full mx-4 p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Atenção!</h3>
+                        <p class="mb-6 text-gray-700 dark:text-gray-300">Você está alterando o saldo atual manualmente.<br><br>O saldo só será fiel se todas as transações anteriores forem excluídas.<br><b>Esta ação é irreversível!</b><br><br>Deseja excluir todas as transações anteriores e definir o novo saldo?</p>
+                        <div class="flex justify-end gap-3">
+                            <button type="button" onclick="app.closeModal('${modalId}')" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border rounded hover:bg-gray-50 dark:hover:bg-gray-600">Cancelar</button>
+                            <button id="confirmClearAndSetBalanceBtn" class="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded hover:bg-red-700">Excluir e Definir Saldo</button>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('modalsContainer').appendChild(modal);
+
+                modal.querySelector('#confirmClearAndSetBalanceBtn').onclick = async () => {
+                    await this.clearAllTransactions();
+                    await this.saveBalanceToSupabase(newBalance);
+                    this.closeModal(modalId);
+                    this.renderDashboard();
+                    this.showNotification('Transações excluídas e saldo atualizado!', 'success');
+                };
             }
 
             // ...dentro da classe FinanceApp...
@@ -1029,6 +1373,7 @@
                 return !error;
             }
 
+            // ...dentro da classe FinanceApp...
             async renderCategories() {
                 // Garante categorias padrão se não houver nenhuma
                 let categories = await this.fetchCategoriesFromSupabase();
@@ -1046,29 +1391,37 @@
                 }
                 this.categories = categories;
 
+                // Lista de nomes das categorias padrão
+                const defaultNames = ['Casa', 'Lazer', 'Salário'];
+
                 const grid = document.getElementById('categoriesGrid');
                 if (!grid) return;
 
                 // Card de adicionar categoria
                 const addCard = `
-                <div onclick="app.openCategoryModal()" class="cursor-pointer bg-white dark:bg-gray-800 border-2 border-dashed border-primary-600 flex flex-col items-center justify-center rounded-xl h-40 transition hover:bg-primary-50 dark:hover:bg-primary-900 hover:border-primary-700">
-                    <div class="text-4xl text-primary-600 mb-2">＋</div>
-                    <div class="text-sm font-medium text-primary-700 dark:text-primary-300">Nova Categoria</div>
-                </div>
+                    <div onclick="app.openCategoryModal()" class="cursor-pointer bg-white dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 rounded-xl flex flex-col items-center justify-center p-6 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <div class="text-4xl text-primary-600 dark:text-primary-400 mb-2">+</div>
+                        <div class="text-sm font-medium text-gray-700 dark:text-gray-300">Nova Categoria</div>
+                    </div>
                 `;
 
                 // Cards das categorias
-                const catCards = categories.map(cat => `
-                <div class="group bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center h-40 transition-all duration-300 relative">
-                    <div class="text-4xl mb-2">${cat.icon || '📦'}</div>
-                    <div class="font-semibold text-gray-900 dark:text-gray-100 mb-1">${cat.name}</div>
-                    <div class="text-xs text-gray-500 dark:text-gray-400 mb-2 text-center">${cat.description || ''}</div>
-                    <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2">
-                    <button onclick="event.stopPropagation();app.openEditCategoryModal(${cat.id})" class="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900 transition"><svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536M9 11l6 6M3 21h6v-6l9-9a2.828 2.828 0 10-4-4l-9 9z"></path></svg></button>
-                    <button onclick="event.stopPropagation();app.deleteCategory(${cat.id})" class="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900 transition"><svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                const catCards = categories.map(cat => {
+                    const isDefault = defaultNames.includes(cat.name);
+                    return `
+                    <div class="group bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center h-40 transition-all duration-300 relative">
+                        <div class="text-4xl mb-2">${cat.icon || '📦'}</div>
+                        <div class="font-semibold text-gray-900 dark:text-gray-100 mb-1">${cat.name}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mb-2 text-center">${cat.description || ''}</div>
+                        ${!isDefault ? `
+                        <div class="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity absolute top-2 right-2">
+                            <button onclick="event.stopPropagation();app.openEditCategoryModal(${cat.id})" class="p-1 rounded hover:bg-blue-100 dark:hover:bg-blue-900 transition"><svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1.003 1.003 0 000-1.42l-2.34-2.34a1.003 1.003 0 00-1.42 0l-1.83 1.83 3.75 3.75 1.84-1.82z"></path></svg></button>
+                            <button onclick="event.stopPropagation();app.deleteCategory(${cat.id})" class="p-1 rounded hover:bg-red-100 dark:hover:bg-red-900 transition"><svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                        </div>
+                        ` : ''}
                     </div>
-                </div>
-                `).join('');
+                    `;
+                }).join('');
 
                 grid.innerHTML = addCard + catCards;
             }
@@ -1206,12 +1559,20 @@
                     this.renderCurrentSection();
                 };
             }
+
             openEditCategoryModal(id) {
                 const cat = this.categories.find(c => c.id === id);
-                if (cat) this.openCategoryModal(cat);
+                const defaultNames = ['Casa', 'Lazer', 'Salário'];
+                if (cat && !defaultNames.includes(cat.name)) this.openCategoryModal(cat);
             }
 
             async deleteCategory(id) {
+                const cat = this.categories.find(c => c.id === id);
+                const defaultNames = ['Casa', 'Lazer', 'Salário'];
+                if (cat && defaultNames.includes(cat.name)) {
+                    this.showNotification('Esta categoria padrão não pode ser excluída.', 'error');
+                    return;
+                }
                 if (confirm('Deseja excluir esta categoria?')) {
                     await this.deleteCategoryFromSupabase(id);
                     this.renderCategories();
@@ -1362,6 +1723,144 @@
                 if (addCategoryBtn) {
                     addCategoryBtn.addEventListener('click', () => this.openCategoryModal());
                 }
+                const clearBtn = document.getElementById('clearAllTransactionsBtn');
+                if (clearBtn) {
+                    clearBtn.addEventListener('click', () => this.openClearTransactionsModal());
+                }
+            }
+
+            openClearTransactionsModal() {
+                const modalId = 'clearTransactionsModal';
+                if (document.getElementById(modalId)) return;
+                const modal = document.createElement('div');
+                modal.id = modalId;
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-sm w-full mx-4 p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Limpar todas as transações?</h3>
+                        <p class="mb-6 text-gray-700 dark:text-gray-300">Esta ação é irreversível. Tem certeza que deseja excluir <b>todas</b> as transações?</p>
+                        <div class="flex justify-end gap-3">
+                            <button onclick="app.closeModal('${modalId}')" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600">Cancelar</button>
+                            <button id="confirmClearTransactionsBtn" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Limpar Tudo</button>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('modalsContainer').appendChild(modal);
+
+                modal.querySelector('#confirmClearTransactionsBtn').onclick = async () => {
+                    await this.clearAllTransactions();
+                    this.closeModal(modalId);
+                };
+            }
+
+            openMigrateAndDeleteCategoryModal(categoryId) {
+                const category = this.categories.find(c => c.id === categoryId);
+                if (!category) return;
+
+                // Não permitir migrar para a própria categoria ou categorias padrão
+                const defaultNames = ['Casa', 'Lazer', 'Salário'];
+                const otherCategories = this.categories.filter(c => c.id !== categoryId);
+
+                const modalId = 'migrateDeleteCategoryModal';
+                if (document.getElementById(modalId)) return;
+
+                const modal = document.createElement('div');
+                modal.id = modalId;
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-sm w-full mx-4 p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">Excluir categoria "${category.name}"</h3>
+                        <p class="mb-4 text-gray-700 dark:text-gray-300">
+                            Para excluir esta categoria, é necessário migrar todas as transações vinculadas para outra categoria.
+                        </p>
+                        <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Migrar para:</label>
+                        <select id="migrateCategorySelect" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 mb-6">
+                            <option value="">Selecione a categoria de destino</option>
+                            ${otherCategories.map(cat => `<option value="${cat.id}">${cat.icon || '📦'} ${cat.name}</option>`).join('')}
+                        </select>
+                        <div class="flex justify-end gap-3">
+                            <button onclick="app.closeModal('${modalId}')" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded hover:bg-gray-300 dark:hover:bg-gray-600">Cancelar</button>
+                            <button id="confirmMigrateDeleteCategoryBtn" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">Migrar e Excluir</button>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('modalsContainer').appendChild(modal);
+
+                modal.querySelector('#confirmMigrateDeleteCategoryBtn').onclick = async () => {
+                    const targetId = modal.querySelector('#migrateCategorySelect').value;
+                    if (!targetId) {
+                        this.showNotification('Selecione uma categoria de destino.', 'error');
+                        return;
+                    }
+                    await this.migrateAndDeleteCategory(categoryId, targetId);
+                    this.closeModal(modalId);
+                };
+            }
+
+            async migrateAndDeleteCategory(categoryId, targetCategoryId) {
+                // Atualiza todas as transações para a nova categoria
+                const { error: updateError } = await supabase
+                    .from('transactions')
+                    .update({ category: targetCategoryId })
+                    .eq('category', categoryId);
+
+                if (updateError) {
+                    this.showNotification('Erro ao migrar transações.', 'error');
+                    return;
+                }
+
+                // Exclui a categoria
+                const { error: deleteError } = await supabase
+                    .from('categories')
+                    .delete()
+                    .eq('id', categoryId);
+
+                if (deleteError) {
+                    this.showNotification('Erro ao excluir categoria.', 'error');
+                    return;
+                }
+
+                // Atualiza listas locais e UI
+                this.categories = await this.fetchCategoriesFromSupabase();
+                this.transactions = await this.fetchTransactionsFromSupabase();
+                this.renderCategories();
+                this.renderCurrentSection();
+                this.showNotification('Categoria excluída e transações migradas!', 'success');
+            }
+
+            async clearAllTransactions() {
+                const user = (await supabase.auth.getUser()).data.user;
+                if (!user) return;
+                const { error } = await supabase.from('transactions').delete().eq('user_id', user.id);
+                if (!error) {
+                    this.transactions = [];
+                    this.renderCurrentSection();
+                    this.showNotification('Todas as transações foram removidas!', 'success');
+                } else {
+                    this.showNotification('Erro ao limpar transações.', 'error');
+                }
+            }
+
+            async deleteCategory(id) {
+                const cat = this.categories.find(c => c.id === id);
+                const defaultNames = ['Casa', 'Lazer', 'Salário'];
+                if (cat && defaultNames.includes(cat.name)) {
+                    this.showNotification('Esta categoria padrão não pode ser excluída.', 'error');
+                    return;
+                }
+                // Verifica se há transações vinculadas
+                const hasTransactions = this.transactions.some(t => t.category == id);
+                if (hasTransactions) {
+                    this.openMigrateAndDeleteCategoryModal(id);
+                    return;
+                }
+                // Se não houver transações, pode excluir direto
+                if (confirm('Deseja excluir esta categoria?')) {
+                    await this.deleteCategoryFromSupabase(id);
+                    this.categories = await this.fetchCategoriesFromSupabase();
+                    this.renderCategories();
+                    this.renderCurrentSection();
+                }
             }
             
             // Navigation
@@ -1398,10 +1897,11 @@
                     transactions: this.t('Transações'),
                     budgets: this.t('Orçamentos'),
                     goals: this.t('Metas'),
+                    categories: this.t('Categorias'),
                     reports: this.t('Relatórios'),
                     settings: this.t('Configurações')
                 };
-          
+
                 document.getElementById('pageTitle').textContent = titles[section];
                 this.currentSection = section;
                 
@@ -1572,82 +2072,97 @@
                 }, 10);
             }
 
-
-
-
             createBudgetModal() {
                 const modalId = 'budgetModal';
                 const modal = document.createElement('div');
                 modal.id = modalId;
                 modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 opacity-0 transition-opacity duration-300';
 
-                modal.innerHTML = `
-                    <div class="modal-content bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full mx-4 transform scale-95 transition-transform duration-300">
-                        <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                            <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Novo Orçamento</h3>
-                        </div>
-                        <form id="budgetForm" class="p-6 space-y-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Categoria</label>
-                                <select name="category" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-                                    <option value="">Selecione a categoria</option>
-                                    ${this.categories.map(cat =>
-                                        `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`
-                                    ).join('')}
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Valor do Limite</label>
-                                <input type="number" name="limit" min="0" step="0.01" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="0,00" />
-                            </div>
-                            <div class="flex justify-end space-x-3 pt-4">
-                                <button type="button" onclick="app.closeModal('${modalId}')" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors">
-                                    Cancelar
-                                </button>
-                                <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors">
-                                    Criar
-                                </button>
-                            </div>
-                        </form>
+        modal.innerHTML = `
+            <div class="modal-content bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full mx-4 transform scale-95 transition-transform duration-300">
+                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Novo Orçamento</h3>
+                </div>
+                <form id="budgetForm" class="p-6 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Categoria</label>
+                        <select name="category" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                            <option value="">Selecione a categoria</option>
+                            ${this.categories.map(cat =>
+                                `<option value="${cat.id}">${cat.icon || '📦'} ${cat.name}</option>`
+                            ).join('')}
+                            <option value="__new__">＋ Nova Categoria</option>
+                        </select>
                     </div>
-                `;
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Valor do Limite</label>
+                        <input type="number" name="limit" min="0" step="0.01" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="0,00" />
+                    </div>
+                    <div class="flex justify-end space-x-3 pt-4">
+                        <button type="button" onclick="app.closeModal('${modalId}')" class="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors">Cancelar</button>
+                        <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-colors">Criar</button>
+                    </div>
+                </form>
+            </div>
+        `;
 
-                // Aqui pega o form dentro do modal e adiciona o evento submit
-                const form = modal.querySelector('#budgetForm');
-                // ...dentro do eventListener do form em createBudgetModal...
-
-                form.addEventListener('submit', async e => {
-                    e.preventDefault();
-                    const category = form.category.value;
-                    const limit = parseFloat(form.limit.value);
-
-                    if (!category) {
-                        alert('Por favor, selecione uma categoria.');
-                        return;
-                    }
-                    if (isNaN(limit) || limit <= 0) {
-                        alert('Por favor, insira um valor válido para o limite.');
-                        return;
-                    }
-
-                    const user = supabase.auth.getUser ? (await supabase.auth.getUser()).data.user : null;
-                    const newBudget = {
-                        category: category,
-                        budget_limit: limit,
-                        period: 'monthly',
-                        user_id: user ? user.id : null
-                    };
-                    const ok = await this.addBudgetToSupabase(newBudget);
-                    if (ok && ok.data && ok.data[0]) {
-                        const budgetFromDb = ok.data[0];
-                        this.budgets.push({
-                            ...budgetFromDb,
-                            limit: budgetFromDb.budget_limit
+        // Aqui pega o form dentro do modal e adiciona o evento submit
+        const form = modal.querySelector('#budgetForm');
+        const categorySelect = form.querySelector('select[name="category"]');
+        if (categorySelect) {
+            categorySelect.addEventListener('change', async (e) => {
+                if (e.target.value === '__new__') {
+                    this.closeModal(modalId);
+                    await new Promise(resolve => {
+                        // Abre o modal de categoria e injeta callback para reabrir o de orçamento
+                        this.openCategoryModal();
+                        const observer = new MutationObserver(() => {
+                            if (!document.getElementById('categoryModal')) {
+                                observer.disconnect();
+                                resolve();
+                            }
                         });
-                        this.renderBudgets();
-                        this.closeModal(modalId);
-                    }
+                        observer.observe(document.body, { childList: true, subtree: true });
+                    });
+                    // Atualiza categorias e reabre o modal de orçamento
+                    this.categories = await this.fetchCategoriesFromSupabase();
+                    this.openBudgetModal();
+                }
+            });
+        }
+
+        form.addEventListener('submit', async e => {
+            e.preventDefault();
+            const category = form.category.value;
+            const limit = parseFloat(form.limit.value);
+
+            if (!category) {
+                alert('Por favor, selecione uma categoria.');
+                return;
+            }
+            if (isNaN(limit) || limit <= 0) {
+                alert('Por favor, insira um valor válido para o limite.');
+                return;
+            }
+
+            const user = supabase.auth.getUser ? (await supabase.auth.getUser()).data.user : null;
+            const newBudget = {
+                category: category,
+                budget_limit: limit,
+                period: 'monthly',
+                user_id: user ? user.id : null
+            };
+            const ok = await this.addBudgetToSupabase(newBudget);
+            if (ok && ok.data && ok.data[0]) {
+                const budgetFromDb = ok.data[0];
+                this.budgets.push({
+                    ...budgetFromDb,
+                    limit: budgetFromDb.budget_limit
                 });
+                this.renderBudgets();
+                this.closeModal(modalId);
+            }
+        });
 
                 return modal;
             }
@@ -1670,11 +2185,40 @@
                         <form id="transactionForm" class="p-6 space-y-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo</label>
-                                <select name="type" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-                                    <option value="">Selecione o tipo</option>
-                                    <option value="income" ${transaction?.type === 'income' ? 'selected' : ''}>Receita</option>
-                                    <option value="expense" ${transaction?.type === 'expense' ? 'selected' : ''}>Despesa</option>
-                                </select>
+                                <div class="flex gap-4">
+                                    <button type="button" id="btnIncomeType" class="relative flex-1 px-0 py-0 rounded-lg border-2 border-green-500 bg-green-50 dark:bg-green-900 text-green-700 dark:text-green-200 font-semibold h-16 flex items-center justify-center transition group focus:outline-none focus:ring-2 focus:ring-green-400">
+                                        <span class="relative z-10 flex items-center justify-center w-full h-full">
+                                            <span class="flex-1 flex items-center justify-center h-full text-center">Receita</span>
+                                            <span class="ml-2 opacity-30 pointer-events-none flex items-center h-full arrow-animate">
+                                                <svg width="32" height="32" fill="none" viewBox="0 0 48 48"><path d="M24 38V10M24 10l-8 8M24 10l8 8" stroke="#22c55e" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                            </span>
+                                        </span>
+                                    </button>
+                                    <button type="button" id="btnExpenseType" class="relative flex-1 px-0 py-0 rounded-lg border-2 border-red-500 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-200 font-semibold h-16 flex items-center justify-center transition group focus:outline-none focus:ring-2 focus:ring-red-400">
+                                        <span class="relative z-10 flex items-center justify-center w-full h-full">
+                                            <span class="flex-1 flex items-center justify-center h-full text-center">Despesa</span>
+                                            <span class="ml-2 opacity-30 pointer-events-none flex items-center h-full arrow-animate">
+                                                <svg width="32" height="32" fill="none" viewBox="0 0 48 48"><path d="M24 10v28M24 38l-8-8M24 38l8-8" stroke="#ef4444" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                            </span>
+                                        </span>
+                                        <style>
+                                        @keyframes arrowSpin {
+                                        0% { transform: rotate(0deg) scale(1); }
+                                        30% { transform: rotate(15deg) scale(1.15); }
+                                        50% { transform: rotate(-8deg) scale(1.08); }
+                                        70% { transform: rotate(8deg) scale(1.12); }
+                                        100% { transform: rotate(0deg) scale(1); }
+                                        }
+                                        .arrow-animate {
+                                        transition: transform 0.4s cubic-bezier(.4,0,.2,1);
+                                        }
+                                        .group:hover .arrow-animate {
+                                        animation: arrowSpin 1.2s cubic-bezier(.4,0,.2,1);
+                                        }
+                                        </style>
+                                    </button>
+                                </div>
+                                <input type="hidden" name="type" id="transactionTypeInput" value="${transaction?.type || 'income'}" />
                                 <div class="error-message text-red-500 text-sm mt-1 hidden"></div>
                             </div>
                             
@@ -1721,6 +2265,27 @@
                 `;
 
                 setTimeout(() => {
+                    // Tipo: botões Receita/Despesa
+                    const btnIncome = modal.querySelector('#btnIncomeType');
+                    const btnExpense = modal.querySelector('#btnExpenseType');
+                    const typeInput = modal.querySelector('#transactionTypeInput');
+                    if (btnIncome && btnExpense && typeInput) {
+                        const setType = (type) => {
+                            typeInput.value = type;
+                            if (type === 'income') {
+                                btnIncome.classList.add('border-green-600', 'ring-2', 'ring-green-400');
+                                btnExpense.classList.remove('border-red-600', 'ring-2', 'ring-red-400');
+                            } else {
+                                btnExpense.classList.add('border-red-600', 'ring-2', 'ring-red-400');
+                                btnIncome.classList.remove('border-green-600', 'ring-2', 'ring-green-400');
+                            }
+                        };
+                        btnIncome.onclick = () => setType('income');
+                        btnExpense.onclick = () => setType('expense');
+                        // Estado inicial
+                        setType(typeInput.value);
+                    }
+                    // ...categoria nova...
                     const categorySelect = modal.querySelector('select[name="category"]');
                     if (categorySelect) {
                         categorySelect.addEventListener('change', async (e) => {
@@ -2417,7 +2982,7 @@
                 const createCard = `
                     <div onclick="app.openBudgetModal()" class="cursor-pointer bg-white dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 rounded-xl flex flex-col items-center justify-center p-6 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
                         <div class="text-4xl text-primary-600 dark:text-primary-400 mb-2">+</div>
-                        <div class="text-sm font-medium text-gray-700 dark:text-gray-300">Criar novo orçamento</div>
+                        <div class="text-sm font-medium text-gray-700 dark:text-gray-300">Novo Orçamento</div>
                     </div>
                 `;
 
@@ -2489,6 +3054,15 @@
                 modal.id = modalId;
                 modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 opacity-0 transition-opacity duration-300';
 
+                // Calcula valor formatado da data limite
+                let deadlineValue = '';
+                if (goal?.deadline) {
+                    deadlineValue = this.formatDateBR(goal.deadline);
+                } else {
+                    const d = new Date();
+                    d.setDate(d.getDate() + 1);
+                    deadlineValue = this.formatDateBR(d);
+                }
                 modal.innerHTML = `
                     <div class="modal-content bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-md w-full mx-4 transform scale-95 transition-transform duration-300">
                         <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -2515,8 +3089,9 @@
 
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data Limite</label>
-                                <input type="date" name="deadline" value="${goal?.deadline || new Date().toISOString().split('T')[0]}" required
-                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent">
+                                <input type="text" name="deadline" maxlength="10" required
+                                    value="${deadlineValue}"
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-primary-500 focus:border-transparent" placeholder="dd/mm/aaaa">
                                 <div class="error-message text-red-500 text-sm mt-1 hidden"></div>
                             </div>
 
@@ -2564,7 +3139,7 @@
                 const name = form.name.value.trim();
                 const icon = form.icon.value;
                 const target = parseFloat(form.target.value.replace(',', '.'));
-                const deadline = form.deadline.value;
+                const deadline = this.parseDateBR(form.deadline.value);
 
                 if (!name || !icon || isNaN(target) || target <= 0 || !deadline) {
                     alert('Preencha todos os campos corretamente!');
@@ -2845,11 +3420,9 @@
 
                 // Card de Nova Meta
                 const addGoalCard = `
-                    <div onclick="app.openGoalModal()" class="cursor-pointer flex items-center justify-center bg-white dark:bg-gray-800 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-6 text-gray-500 hover:text-purple-600 hover:border-purple-600 transition-all duration-300">
-                        <div class="text-center">
-                            <div class="text-4xl mb-2">＋</div>
-                            <div class="text-sm font-medium">Nova Meta</div>
-                        </div>
+                    <div onclick="app.openGoalModal()" class="cursor-pointer bg-white dark:bg-gray-800 border border-dashed border-gray-300 dark:border-gray-600 rounded-xl flex flex-col items-center justify-center p-6 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                        <div class="text-4xl text-primary-600 dark:text-primary-400 mb-2">+</div>
+                        <div class="text-sm font-medium text-gray-700 dark:text-gray-300">Nova Meta</div>
                     </div>
                 `;
 
@@ -3004,131 +3577,91 @@
 
                 // === Gráfico de Pizza: Distribuição de Despesas ===
                 if (distributionCtx) {
-                    if (this._distributionChart) this._distributionChart.destroy();
+    if (this._distributionChart) this._distributionChart.destroy();
 
-                    const categoryTotals = {};
-                    (this.transactions || []).forEach(tx => {
-                        if (tx.type === 'expense') {
-                            categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + tx.amount;
+    const categoryTotals = {};
+    (this.transactions || []).forEach(tx => {
+        if (tx.type === 'expense') {
+            categoryTotals[tx.category] = (categoryTotals[tx.category] || 0) + tx.amount;
+        }
+    });
+
+    let labels, data, palette;
+    if (Object.keys(categoryTotals).length === 0) {
+        // Sem dados: círculo cinza translúcido
+        labels = ['Sem dados'];
+        data = [1];
+        palette = ['rgba(120,120,120,0.15)'];
+    } else {
+        labels = Object.keys(categoryTotals).map(cat => (this.categories.find(c => c.id == cat)?.name || cat));
+        data = Object.values(categoryTotals);
+        palette = [
+            '#3b82f6', '#10b981', '#f59e0b',
+            '#ef4444', '#8b5cf6', '#ec4899', '#0ea5e9'
+        ];
+    }
+
+    // Pegando cores do tema atual
+    const rootStyles = getComputedStyle(document.documentElement);
+    const textColor = rootStyles.getPropertyValue('--text-color').trim() || '#333';
+    const tooltipBg = rootStyles.getPropertyValue('--tooltip-bg').trim() || '#222';
+    const tooltipTitle = rootStyles.getPropertyValue('--tooltip-title').trim() || '#fff';
+    const tooltipText = rootStyles.getPropertyValue('--tooltip-text').trim() || '#fff';
+
+    this._distributionChart = new Chart(distributionCtx, {
+        type: 'doughnut',
+        data: {
+            labels,
+            datasets: [{
+                data,
+                backgroundColor: palette,
+                hoverBackgroundColor: palette.map(c => c + 'cc'),
+                borderColor: 'transparent',
+                borderWidth: 0
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            animation: {
+                animateRotate: true,
+                animateScale: true,
+                duration: 1000,
+                easing: 'easeOutQuart'
+            },
+            plugins: {
+                legend: {
+                    display: Object.keys(categoryTotals).length > 0,
+                    position: 'bottom',
+                    labels: {
+                        color: textColor,
+                        font: { size: 14, weight: '600' },
+                        boxWidth: 14,
+                        padding: 10
+                    }
+                },
+                tooltip: {
+                    enabled: Object.keys(categoryTotals).length > 0,
+                    backgroundColor: tooltipBg,
+                    titleColor: tooltipTitle,
+                    bodyColor: tooltipText,
+                    cornerRadius: 8,
+                    padding: 12,
+                    callbacks: {
+                        label: ctx => {
+                            if (Object.keys(categoryTotals).length === 0) return 'Sem dados';
+                            const value = ctx.parsed;
+                            const total = data.reduce((sum, val) => sum + val, 0);
+                            const percent = ((value / total) * 100).toFixed(1);
+                            return `${ctx.label}: R$ ${value.toLocaleString('pt-BR')} (${percent}%)`;
                         }
-                    });
-
-                    const labels = Object.keys(categoryTotals).map(cat => (this.categories.find(c => c.id == cat)?.name || cat));
-                    const data = Object.values(categoryTotals);
-                    const total = data.reduce((sum, val) => sum + val, 0);
-
-                    const palette = [
-                        '#3b82f6', '#10b981', '#f59e0b',
-                        '#ef4444', '#8b5cf6', '#ec4899', '#0ea5e9'
-                    ];
-
-                    // Pegando cores do tema atual
-                    const rootStyles = getComputedStyle(document.documentElement);
-                    const textColor = rootStyles.getPropertyValue('--text-color').trim() || '#333';
-                    const tooltipBg = rootStyles.getPropertyValue('--tooltip-bg').trim() || '#222';
-                    const tooltipTitle = rootStyles.getPropertyValue('--tooltip-title').trim() || '#fff';
-                    const tooltipText = rootStyles.getPropertyValue('--tooltip-text').trim() || '#fff';
-
-                    this._distributionChart = new Chart(distributionCtx, {
-                        type: 'doughnut',
-                        data: {
-                            labels,
-                            datasets: [{
-                                data,
-                                backgroundColor: palette,
-                                hoverBackgroundColor: palette.map(c => c + 'cc'),
-                                borderColor: 'transparent',
-                                borderWidth: 0
-                            }]
-                        },
-                        options: {
-                            responsive: true,
-                            maintainAspectRatio: false,
-                            cutout: '65%',
-                            animation: {
-                                animateRotate: true,
-                                animateScale: true,
-                                duration: 1000,
-                                easing: 'easeOutQuart'
-                            },
-                            hover: {
-                                mode: 'nearest',
-                                onHover: (e, elements) => {
-                                    e.native.target.style.cursor = elements.length ? 'pointer' : 'default';
-                                }
-                            },
-                            plugins: {
-                                legend: {
-                                    position: 'bottom',
-                                    labels: {
-                                        color: textColor,
-                                        font: { size: 14, weight: '600' },
-                                        boxWidth: 14,
-                                        padding: 10
-                                    }
-                                },
-                                tooltip: {
-                                    backgroundColor: tooltipBg,
-                                    titleColor: tooltipTitle,
-                                    bodyColor: tooltipText,
-                                    cornerRadius: 8,
-                                    padding: 12,
-                                    callbacks: {
-                                        label: ctx => {
-                                            const value = ctx.parsed;
-                                            const percent = ((value / total) * 100).toFixed(1);
-                                            return `${ctx.label}: R$ ${value.toLocaleString('pt-BR')} (${percent}%)`;
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        plugins: [
-                            {
-                                id: 'hoverGlow',
-                                afterDatasetDraw(chart) {
-                                    const { ctx } = chart;
-                                    const activeElements = chart.getActiveElements();
-                                    if (activeElements.length > 0) {
-                                        const { index, datasetIndex } = activeElements[0];
-                                        const meta = chart.getDatasetMeta(datasetIndex);
-                                        const arc = meta.data[index];
-                                        ctx.save();
-                                        ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
-                                        ctx.shadowBlur = 20;
-                                        arc.draw(ctx);
-                                        ctx.restore();
-                                    }
-                                }
-                            },
-                            {
-                                id: 'centerText',
-                                beforeDraw(chart) {
-                                    const { ctx, width, height } = chart;
-                                    ctx.save();
-
-                                    // Total formatado
-                                    const total = chart.data.datasets[0].data.reduce((sum, val) => sum + val, 0);
-                                    const formattedTotal = `R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-
-                                    // Estilos
-                                    ctx.font = '700 20px "Helvetica Neue", Helvetica, Arial, sans-serif';
-                                    ctx.fillStyle = textColor;
-                                    ctx.textAlign = 'center';
-                                    ctx.textBaseline = 'middle';
-                                    ctx.shadowColor = 'rgba(0,0,0,0.1)';
-                                    ctx.shadowBlur = 10;
-                                    ctx.shadowOffsetX = 0;
-                                    ctx.shadowOffsetY = 2;
-
-                                    ctx.fillText(formattedTotal, width / 2, height / 2);
-
-                                    ctx.restore();
-                                }
-                            }
-                        ]
-                    });
+                    }
                 }
+            }
+        }
+    });
+}
             }
             
             renderSettings() {
@@ -3247,6 +3780,8 @@
                                     }
                                 },
                                 y: {
+                                    min: 0,
+                                    beginAtZero: true,
                                     ticks: {
                                         color: textColor,
                                         font: { size: 13 },
@@ -3274,16 +3809,22 @@
                         }
                     });
 
-                    const labels = Object.keys(categoryTotals).map(cat => (this.categories.find(c => c.id == cat)?.name || cat));
-                    const data = Object.values(categoryTotals);
-                    const total = data.reduce((sum, val) => sum + val, 0);
+                    let labels, data, palette;
+                    if (Object.keys(categoryTotals).length === 0) {
+                        // Sem dados: círculo cinza translúcido
+                        labels = ['Sem dados'];
+                        data = [1];
+                        palette = ['rgba(120,120,120,0.15)'];
+                    } else {
+                        labels = Object.keys(categoryTotals).map(cat => (this.categories.find(c => c.id == cat)?.name || cat));
+                        data = Object.values(categoryTotals);
+                        palette = [
+                            '#3b82f6', '#10b981', '#f59e0b',
+                            '#ef4444', '#8b5cf6', '#ec4899', '#0ea5e9'
+                        ];
+                    }
 
-                    const palette = [
-                        '#3b82f6', '#10b981', '#f59e0b',
-                        '#ef4444', '#8b5cf6', '#ec4899', '#0ea5e9'
-                    ];
-
-                    // Pega as cores do tema atual (dark/light)
+                    // ...pegue as cores do tema...
                     const rootStyles = getComputedStyle(document.documentElement);
                     const textColor = rootStyles.getPropertyValue('--text-color').trim() || '#333';
                     const tooltipBg = rootStyles.getPropertyValue('--tooltip-bg').trim() || '#222';
@@ -3312,15 +3853,9 @@
                                 duration: 1000,
                                 easing: 'easeOutQuart'
                             },
-                            hover: {
-                                mode: 'nearest',
-                                onHover: (e, elements) => {
-                                    const el = e.native?.target;
-                                    if (el) el.style.cursor = elements.length ? 'pointer' : 'default';
-                                }
-                            },
                             plugins: {
                                 legend: {
+                                    display: Object.keys(categoryTotals).length > 0,
                                     position: 'bottom',
                                     labels: {
                                         color: textColor,
@@ -3330,6 +3865,7 @@
                                     }
                                 },
                                 tooltip: {
+                                    enabled: Object.keys(categoryTotals).length > 0,
                                     backgroundColor: tooltipBg,
                                     titleColor: tooltipTitle,
                                     bodyColor: tooltipText,
@@ -3337,61 +3873,16 @@
                                     padding: 12,
                                     callbacks: {
                                         label: ctx => {
+                                            if (Object.keys(categoryTotals).length === 0) return 'Sem dados';
                                             const value = ctx.parsed;
+                                            const total = data.reduce((sum, val) => sum + val, 0);
                                             const percent = ((value / total) * 100).toFixed(1);
                                             return `${ctx.label}: R$ ${value.toLocaleString('pt-BR')} (${percent}%)`;
                                         }
                                     }
                                 }
                             }
-                        },
-                        plugins: [
-                            {
-                                id: 'hoverGlow',
-                                afterDatasetDraw(chart) {
-                                    const { ctx } = chart;
-                                    const activeElements = chart.getActiveElements();
-                                    if (activeElements.length > 0) {
-                                        const { index, datasetIndex } = activeElements[0];
-                                        const meta = chart.getDatasetMeta(datasetIndex);
-                                        const arc = meta.data[index];
-
-                                        ctx.save();
-                                        ctx.shadowColor = 'rgba(0, 0, 0, 0.15)';
-                                        ctx.shadowBlur = 20;
-                                        arc.draw(ctx);
-                                        ctx.restore();
-                                    }
-                                }
-                            },
-                            {
-                                id: 'centerText',
-                                beforeDraw(chart) {
-                                    const { ctx, width, height } = chart;
-                                    ctx.save();
-
-                                    // Total calculado e formatado
-                                    const total = chart.data.datasets[0].data.reduce((sum, val) => sum + val, 0);
-                                    const formattedTotal = `R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-
-                                    // Cores e estilos do tema, com fallback
-                                    const color = textColor;
-                                    const shadowColor = 'rgba(0,0,0,0.1)';
-
-                                    // Fonte e sombra para o valor principal (maior)
-                                    ctx.font = '700 20px "Helvetica Neue", Helvetica, Arial, sans-serif';
-                                    ctx.fillStyle = color;
-                                    ctx.textAlign = 'center';
-                                    ctx.textBaseline = 'middle';
-                                    ctx.shadowColor = shadowColor;
-                                    ctx.shadowBlur = 10;
-                                    ctx.shadowOffsetX = 0;
-                                    ctx.shadowOffsetY = 2;
-                                
-                                    ctx.restore();
-                                }
-                            }
-                        ]
+                        }
                     });
                 }
 
@@ -3517,6 +4008,9 @@
         document.addEventListener('DOMContentLoaded', async () => {
             const loginModal = document.getElementById('loginModal');
             const registerModal = document.getElementById('registerModal');
+            // Exibe apenas o modal de login ao iniciar
+            loginModal.classList.remove('hidden');
+            registerModal.classList.add('hidden');
             const openRegisterBtn = document.getElementById('openRegisterBtn');
             const backToLoginBtn = document.getElementById('backToLoginBtn');
             const loginForm = document.getElementById('loginForm');
@@ -3534,17 +4028,26 @@
 
             // Alternar modais
             if (openRegisterBtn) openRegisterBtn.onclick = () => {
-                loginModal.style.display = 'none';
-                registerModal.style.display = 'flex';
-                registerError.classList.add('hidden');
-                // Limpa campos do cadastro se quiser também
+                console.log('Abrindo modal de cadastro');
+                if (loginModal && registerModal) {
+                    loginModal.classList.add('hidden');
+                    registerModal.classList.remove('hidden');
+                    loginModal.style.display = '';
+                    registerModal.style.display = '';
+                }
+                if (registerError) registerError.classList.add('hidden');
                 if (registerForm) registerForm.reset();
             };
             if (backToLoginBtn) backToLoginBtn.onclick = () => {
-                registerModal.style.display = 'none';
-                loginModal.style.display = 'flex';
-                loginError.classList.add('hidden');
-                clearLoginFields();
+                console.log('Abrindo modal de login');
+                if (loginModal && registerModal) {
+                    loginModal.classList.remove('hidden');
+                    registerModal.classList.add('hidden');
+                    loginModal.style.display = '';
+                    registerModal.style.display = '';
+                }
+                if (loginError) loginError.classList.add('hidden');
+                clearLoginFields && clearLoginFields();
             };
 
             // Cadastro
@@ -3592,40 +4095,53 @@
                 };
             }
 
-            // Login
-            if (loginForm) {
+                // Login
+                if (loginForm) {
                 loginForm.onsubmit = async (e) => {
                     e.preventDefault();
                     const email = loginEmail.value.trim();
                     const password = loginPassword.value;
                     loginError.classList.add('hidden');
 
+                    showLoadingScreen(true); // Mostra tela de carregamento
+
                     const { error } = await supabase.auth.signInWithPassword({ email, password });
                     if (error) {
+                        showLoadingScreen(false);
                         loginError.textContent = 'E-mail ou senha inválidos.';
                         loginError.classList.remove('hidden');
                     } else {
-                        loginModal.style.display = 'none';
+                        loginModal.style.display = 'flex';
                         document.body.classList.remove('login-active');
-                        window.app = new FinanceApp();
+                        // Aguarda inicialização do app e carregamento dos dados
+                        setTimeout(() => {
+                            window.app = new FinanceApp();
+                            // Esconde tela de carregamento após 1.5s ou quando app estiver pronto
+                            setTimeout(() => showLoadingScreen(false), 1500);
+                        }, 500);
                     }
                 };
             }
 
-            // Verifica se está logado
+            // ...existing code...
+            // Se já está logado, mostra loading rápido antes de inicializar
             const { data: { user } } = await supabase.auth.getUser();
             if (user) {
-                if (loginModal) loginModal.style.display = 'none';
-                if (registerModal) registerModal.style.display = 'none';
-                document.body.classList.remove('login-active');
-                // Só cria o app depois de logado!
-                window.app = new FinanceApp();
+                showLoadingScreen(true);
+                setTimeout(() => {
+                    if (loginModal) loginModal.classList.remove('hidden');
+                    if (registerModal) registerModal.classList.add('hidden');
+                    document.body.classList.remove('login-active');
+                    window.app = new FinanceApp();
+                    setTimeout(() => showLoadingScreen(false), 1200);
+                }, 400);
             } else {
-                if (loginModal) loginModal.style.display = 'flex';
-                if (registerModal) registerModal.style.display = 'none';
+                if (loginModal) loginModal.classList.remove('hidden');
+                if (registerModal) registerModal.classList.add('hidden');
                 document.body.classList.add('login-active');
                 clearLoginFields();
             }
         });
+        
 </script>
 </body>
