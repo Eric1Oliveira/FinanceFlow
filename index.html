@@ -156,7 +156,14 @@
       </button>
      </div>
     </div>
-   </aside><!-- Main Content -->
+   </aside><!-- Mobile Menu Toggle Button -->
+   <button id="mobileMenuToggle" class="mobile-menu-toggle" onclick="toggleMobileMenu()" title="Abrir menu">
+    <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+     <path d="M3 6H21M3 12H21M3 18H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+   </button>
+   <!-- Overlay para fechar menu ao clicar fora -->
+   <div id="mobileMenuOverlay" class="mobile-menu-overlay" onclick="closeMobileMenu()"></div><!-- Main Content -->
    <main class="main-content"><!-- Dashboard Page -->
     <div id="dashboardPage" class="page active">
      <div class="p-6">

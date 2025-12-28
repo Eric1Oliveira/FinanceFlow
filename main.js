@@ -269,6 +269,30 @@
       document.getElementById('signupPasswordConfirm').value = '';
     }
 
+    // Mobile Menu Toggle Functions
+    function toggleMobileMenu() {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('mobileMenuOverlay');
+      
+      sidebar.classList.toggle('active');
+      overlay.classList.toggle('active');
+    }
+
+    function closeMobileMenu() {
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('mobileMenuOverlay');
+      
+      sidebar.classList.remove('active');
+      overlay.classList.remove('active');
+    }
+
+    // Close mobile menu when navigating
+    const originalNavigateTo = window.navigateTo;
+    window.navigateTo = function(page) {
+      closeMobileMenu();
+      return originalNavigateTo(page);
+    }
+
     // Fazer logout
     async function handleLogout() {
       try {
