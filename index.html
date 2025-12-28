@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="pt-BR" class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finance Flow</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="favicon.ico">
+ </head>
+ <body class="h-full">
+  <!-- Tela de Login/Cadastro -->
+  <div id="authContainer" class="fixed inset-0 flex items-center justify-center z-50">
+    <div class="w-full max-w-md mx-4">
+      <!-- Login Form -->
+      <div id="loginForm" class="rounded-2xl p-8 border">
+        <div class="text-center mb-8">
+          <svg width="48" height="48" viewbox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-4"><rect x="4" y="4" width="24" height="24" rx="4" stroke="#10b981" stroke-width="2" /> <path d="M16 10V22M10 16H22" stroke="#10b981" stroke-width="2" stroke-linecap="round" />
+          </svg>
+          <h2 class="text-3xl font-bold">Finance Flow</h2>
+          <p class="mt-2">Bem-vindo de volta</p>
+        </div>
+
+        <form onsubmit="handleLogin(event)" class="space-y-4">
+          <div>
+            <label class="block text-sm font-semibold mb-2">Email</label>
+            <input type="email" id="loginEmail" required placeholder="seu@email.com" class="w-full border rounded-lg px-4 py-3 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold mb-2">Senha</label>
+            <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full border rounded-lg px-4 py-3 focus:outline-none">
+          </div>
+
+          <button type="submit" class="w-full text-white font-semibold py-3 rounded-lg transition-colors mt-6">Entrar</button>
+        </form>
+
+        <p class="text-center mt-6">Não tem conta? <button type="button" onclick="toggleAuthForm()" class="font-semibold">Cadastre-se</button></p>
+      </div>
+
+      <!-- Signup Form -->
+      <div id="signupForm" class="rounded-2xl p-8 border hidden">
+        <div class="text-center mb-8">
+          <svg width="48" height="48" viewbox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" class="mx-auto mb-4"><rect x="4" y="4" width="24" height="24" rx="4" stroke="#10b981" stroke-width="2" /> <path d="M16 10V22M10 16H22" stroke="#10b981" stroke-width="2" stroke-linecap="round" />
+          </svg>
+          <h2 class="text-3xl font-bold">Criar Conta</h2>
+          <p class="mt-2">Comece a controlar suas finanças</p>
+        </div>
+
+        <form onsubmit="handleSignup(event)" class="space-y-4">
+          <div>
+            <label class="block text-sm font-semibold mb-2">Nome Completo</label>
+            <input type="text" id="signupName" required placeholder="Seu Nome" class="w-full border rounded-lg px-4 py-3 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold mb-2">Email</label>
+            <input type="email" id="signupEmail" required placeholder="seu@email.com" class="w-full border rounded-lg px-4 py-3 focus:outline-none">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold mb-2">Senha</label>
+            <input type="password" id="signupPassword" required placeholder="••••••••" minlength="6" class="w-full border rounded-lg px-4 py-3 focus:outline-none">
+            <p class="text-xs mt-1">Mínimo 6 caracteres</p>
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold mb-2">Confirmar Senha</label>
+            <input type="password" id="signupPasswordConfirm" required placeholder="••••••••" minlength="6" class="w-full border rounded-lg px-4 py-3 focus:outline-none">
+          </div>
+
+          <button type="submit" class="w-full text-white font-semibold py-3 rounded-lg transition-colors mt-6">Criar Conta</button>
+        </form>
+
+        <p class="text-center mt-6">Já tem conta? <button type="button" onclick="toggleAuthForm()" class="font-semibold">Entrar</button></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Aplicação Principal -->
+  <div id="app" class="h-full w-full hidden"><!-- Sidebar -->
+   <aside class="sidebar" id="sidebar">
+    <div class="p-6 border-b border-gray-800">
+     <div class="flex items-center gap-3">
+      <svg width="32" height="32" viewbox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="4" y="4" width="24" height="24" rx="4" stroke="#10b981" stroke-width="2" /> <path d="M16 10V22M10 16H22" stroke="#10b981" stroke-width="2" stroke-linecap="round" />
+      </svg>
+      <h1 class="text-xl font-bold">FinanceFlow</h1>
+     </div>
+    </div>
+    <nav class="py-4 flex-1">
+     <div class="sidebar-item" onclick="navigateTo('dashboard')" data-page="0">
+      <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.5" /> <rect x="2" y="11" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.5" /> <rect x="11" y="2" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.5" /> <rect x="11" y="11" width="7" height="7" rx="1" stroke="currentColor" stroke-width="1.5" />
+      </svg><span class="font-semibold">Dashboard</span>
+     </div>
+     <div class="sidebar-item" onclick="navigateTo('transactions')" data-page="1">
+      <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6H16M4 10H16M4 14H10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      </svg><span class="font-semibold">Transações</span>
+     </div>
+     <div class="sidebar-item" onclick="navigateTo('recurring')" data-page="2">
+      <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 10C4 6.686 6.686 4 10 4C13.314 4 16 6.686 16 10C16 13.314 13.314 16 10 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /> <path d="M10 4V2M10 4L8 6M10 4L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /> <path d="M4 14L6 12M4 14L6 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg><span class="font-semibold">Recorrentes</span>
+     </div>
+     <div class="sidebar-item" onclick="navigateTo('categories')" data-page="3">
+      <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5" /> <rect x="12" y="2" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5" /> <rect x="2" y="12" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5" /> <rect x="12" y="12" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.5" />
+      </svg><span class="font-semibold">Categorias</span>
+     </div>
+     <div class="sidebar-item" onclick="navigateTo('cards')" data-page="4">
+      <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="1.5" /> <path d="M2 8H18" stroke="currentColor" stroke-width="1.5" /> <circle cx="5" cy="12" r="0.5" fill="currentColor" />
+      </svg><span class="font-semibold">Cartões</span>
+     </div>
+     <div class="sidebar-item" onclick="navigateTo('goals')" data-page="5">
+      <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5" /> <circle cx="10" cy="10" r="4" stroke="currentColor" stroke-width="1.5" /> <circle cx="10" cy="10" r="1" fill="currentColor" />
+      </svg><span class="font-semibold">Metas</span>
+     </div>
+     <div class="sidebar-item achievements-menu-item" onclick="navigateTo('achievements')" data-page="6">
+      <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 2L12 7H17L13 10.5L15 16L10 12L5 16L7 10.5L3 7H8L10 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
+      </svg><span class="font-semibold">Conquistas</span>
+     </div>
+     <div class="sidebar-item" onclick="navigateTo('settings')" data-page="7">
+      <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="3" stroke="currentColor" stroke-width="1.5" /> <path d="M10 2V4M10 16V18M18 10H16M4 10H2M15.5 4.5L14 6M6 14L4.5 15.5M15.5 15.5L14 14M6 6L4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      </svg><span class="font-semibold">Configurações</span>
+     </div>
+    </nav><!-- User Profile Section -->
+    <div class="p-4 border-t border-gray-800 mt-auto">
+     <div class="flex items-center gap-3">
+      <div class="w-12 h-12 rounded-full bg-gradient-to-br from-green-500 to-green-700 flex items-center justify-center flex-shrink-0">
+       <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="4" fill="#000" /> <path d="M6 21C6 17.134 8.686 14 12 14C15.314 14 18 17.134 18 21" stroke="#000" stroke-width="2" stroke-linecap="round" />
+       </svg>
+      </div>
+      <div class="flex-1 min-w-0">
+       <p id="userProfileName" class="font-bold text-sm truncate">Usuário</p>
+       <div class="flex items-center gap-2 mt-1 xp-section">
+        <div class="relative" style="width: 24px; height: 24px;">
+         <svg class="absolute inset-0" width="24" height="24" viewbox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="#1a1a1a" stroke-width="2" /> <circle id="xpCircleMini" cx="12" cy="12" r="10" fill="none" stroke="url(#gradientMini)" stroke-width="2" stroke-linecap="round" stroke-dasharray="62.8" stroke-dashoffset="62.8" transform="rotate(-90 12 12)" style="transition: stroke-dashoffset 0.5s ease;" /> <defs>
+           <lineargradient id="gradientMini" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+            <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+           </lineargradient>
+          </defs>
+         </svg>
+         <div class="absolute inset-0 flex items-center justify-center"><span class="text-[10px] font-bold text-green-500" id="levelNumberMini">1</span>
+         </div>
+        </div>
+        <div class="text-xs text-gray-400"><span class="text-green-500 font-semibold"><span id="currentXPMini">0</span>/<span id="nextLevelXPMini">100</span></span> XP
+        </div>
+       </div>
+      </div>
+      <button id="themeToggleBtn" onclick="toggleTheme()" class="theme-toggle-btn flex-shrink-0" title="Alternar tema" style="display: none;">
+       <svg id="themeToggleIcon" width="20" height="20" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- SVG do raio para Turbo será inserido aqui -->
+       </svg>
+      </button>
+      <button onclick="handleLogout()" class="p-2 hover:bg-gray-800 rounded-lg transition-colors flex-shrink-0" title="Sair">
+       <svg width="20" height="20" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M9 21H5C4.44772 21 4 20.5523 4 20V4C4 3.44772 4.44772 3 5 3H9M16 17L21 12M21 12L16 7M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+      </button>
+     </div>
+    </div>
+   </aside><!-- Main Content -->
+   <main class="main-content"><!-- Dashboard Page -->
+    <div id="dashboardPage" class="page active">
+     <div class="p-6">
+      <div class="flex flex-col md:flex-row items-center justify-center md:justify-between mb-6 gap-4">
+       <div class="flex items-center gap-4 order-2 md:order-1">
+        <h2 class="text-3xl font-bold">Dashboard</h2>
+       </div>
+       <div class="relative order-1 md:order-2">
+        <div class="flex items-center gap-3 rounded-xl px-5 py-3 shadow-xl transition-all month-selector"><button onclick="changeMonth(-1)" class="text-gray-400 hover:text-green-400 transition-all p-2 hover:bg-green-900 hover:bg-opacity-30 rounded-lg">
+          <svg width="18" height="18" viewbox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11 4L7 9L11 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg></button>
+         <div class="text-center min-w-[180px] pb-2">
+          <p id="currentMonthLabel" class="text-sm font-bold month-label"></p>
+         </div><button onclick="changeMonth(1)" class="text-gray-400 hover:text-green-400 transition-all p-2 hover:bg-green-900 hover:bg-opacity-30 rounded-lg">
+          <svg width="18" height="18" viewbox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 4L11 9L7 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg></button>
+        </div><button id="backToCurrentBtn" onclick="backToCurrentMonth()" class="absolute left-1/2 -translate-x-1/2 -bottom-3 text-xs bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-full transition-all flex items-center shadow-lg hover:shadow-green-900 hover:scale-105 z-10" style="display: none;"> Hoje </button>
+       </div>
+       <div class="flex items-center gap-2 order-3"><button class="btn-primary" style="width: auto;" onclick="openTransactionModal()">
+         <svg class="inline-block mr-2" width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+         </svg> Nova Transação </button>
+       </div>
+      </div><!-- Stats Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+       <div class="stat-card">
+        <div class="flex items-center justify-between mb-2"><span class="text-gray-400 text-sm">Saldo Total</span>
+         <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="6" width="18" height="13" rx="2" stroke="#10b981" stroke-width="2" /> <path d="M3 10H21" stroke="#10b981" stroke-width="2" /> <circle cx="7" cy="14" r="1" fill="#10b981" />
+         </svg>
+        </div>
+        <p id="totalBalance" class="text-3xl font-bold text-green-500">R$ 0,00</p>
+       </div>
+       <div class="stat-card">
+        <div class="flex items-center justify-between mb-2"><span class="text-gray-400 text-sm">Receitas (mês)</span>
+         <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 19V5M12 5L5 12M12 5L19 12" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+         </svg>
+        </div>
+        <p id="monthIncome" class="text-3xl font-bold text-green-500">R$ 0,00</p>
+       </div>
+       <div class="stat-card">
+        <div class="flex items-center justify-between mb-2"><span class="text-gray-400 text-sm">Despesas (mês)</span>
+         <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5V19M12 19L19 12M12 19L5 12" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+         </svg>
+        </div>
+        <p id="monthExpenses" class="text-3xl font-bold text-red-500">R$ 0,00</p>
+       </div>
+      </div><!-- Charts -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+       <div class="chart-container">
+        <h3 class="text-xl font-bold mb-4">Despesas por Categoria</h3>
+        <div id="categoryChart"></div>
+       </div>
+       <div class="chart-container">
+        <h3 class="text-xl font-bold mb-4">Últimas Transações</h3>
+        <div id="recentTransactions"></div>
+       </div>
+      </div><!-- Goals Preview -->
+      <div class="chart-container">
+       <div class="flex items-center justify-between mb-4">
+        <h3 class="text-xl font-bold">Minhas Metas</h3><button class="text-green-500 hover:text-green-400 text-sm font-semibold" onclick="navigateTo('goals')">Ver todas →</button>
+       </div>
+       <div id="goalsPreview"></div>
+      </div>
+     </div>
+    </div><!-- Transactions Page -->
+    <div id="transactionsPage" class="page">
+     <div class="p-6">
+      <div class="flex flex-col md:flex-row items-center justify-center md:justify-between mb-6 gap-4">
+       <div class="flex items-center gap-4 order-2 md:order-1">
+        <h2 class="text-3xl font-bold">Transações</h2>
+       </div>
+       <div class="relative order-1 md:order-2">
+        <div class="flex items-center gap-3 rounded-xl px-5 py-3 shadow-xl transition-all month-selector"><button onclick="changeMonth(-1)" class="text-gray-400 hover:text-green-400 transition-all p-2 hover:bg-green-900 hover:bg-opacity-30 rounded-lg">
+          <svg width="18" height="18" viewbox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11 4L7 9L11 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg></button>
+         <div class="text-center min-w-[180px] pb-2">
+          <p id="transactionsMonthLabel" class="text-sm font-bold month-label"></p>
+         </div><button onclick="changeMonth(1)" class="text-gray-400 hover:text-green-400 transition-all p-2 hover:bg-green-900 hover:bg-opacity-30 rounded-lg">
+          <svg width="18" height="18" viewbox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 4L11 9L7 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg></button>
+        </div><button id="backToCurrentBtn2" onclick="backToCurrentMonth()" class="absolute left-1/2 -translate-x-1/2 -bottom-3 text-xs bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-full transition-all flex items-center shadow-lg hover:shadow-green-900 hover:scale-105 z-10" style="display: none;"> Hoje </button>
+       </div>
+       <div class="flex items-center gap-2 order-3"><button class="btn-primary" style="width: auto;" onclick="openTransactionModal()">
+         <svg class="inline-block mr-2" width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+         </svg> Nova Transação </button>
+       </div>
+      </div>
+      <div class="mb-4 flex gap-2"><button class="btn-secondary text-sm" style="width: auto;" onclick="filterTransactions('all')">Todas</button> <button class="btn-secondary text-sm" style="width: auto;" onclick="filterTransactions('receita')">Receitas</button> <button class="btn-secondary text-sm" style="width: auto;" onclick="filterTransactions('despesa')">Despesas</button>
+      </div>
+      <div id="transactionsList"></div>
+     </div>
+    </div><!-- Recurring Transactions Page -->
+    <div id="recurringPage" class="page">
+     <div class="p-6">
+      <div class="flex items-center justify-between mb-6">
+       <h2 class="text-3xl font-bold">Transações Recorrentes</h2><button class="btn-primary" style="width: auto;" onclick="openRecurringModal()">
+        <svg class="inline-block mr-2" width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg> Nova Recorrência </button>
+      </div>
+      <div class="mb-4 flex gap-2"><button class="btn-secondary text-sm" style="width: auto;" onclick="filterRecurring('all')">Todas</button> <button class="btn-secondary text-sm" style="width: auto;" onclick="filterRecurring('permanent')">Permanentes</button> <button class="btn-secondary text-sm" style="width: auto;" onclick="filterRecurring('temporary')">Temporárias</button>
+      </div>
+      <div id="recurringList"></div>
+     </div>
+    </div><!-- Cards Page -->
+    <div id="cardsPage" class="page">
+     <div class="p-6">
+      <div class="flex items-center justify-between mb-6">
+       <h2 class="text-3xl font-bold">Cartões</h2><button class="btn-primary" style="width: auto;" onclick="openCardModal()">
+        <svg class="inline-block mr-2" width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg> Novo Cartão </button>
+      </div>
+      <div id="cardsList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+     </div>
+    </div><!-- Categories Page -->
+    <div id="categoriesPage" class="page">
+     <div class="p-6">
+      <div class="flex items-center justify-between mb-6">
+       <h2 class="text-3xl font-bold">Categorias</h2><button class="btn-primary" style="width: auto;" onclick="openCategoryModal()">
+        <svg class="inline-block mr-2" width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg> Nova Categoria </button>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="categoriesList"></div>
+     </div>
+    </div><!-- Goals Page -->
+    <div id="goalsPage" class="page">
+     <div class="p-6">
+      <div class="flex items-center justify-between mb-6">
+       <h2 class="text-3xl font-bold">Metas Financeiras</h2><button class="btn-primary" style="width: auto;" onclick="openGoalModal()">
+        <svg class="inline-block mr-2" width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+        </svg> Nova Meta </button>
+      </div>
+      <div id="goalsList"></div>
+     </div>
+    </div><!-- Achievements Page -->
+    <div id="achievementsPage" class="page">
+     <div class="p-6">
+      <h2 class="text-3xl font-bold mb-6">Conquistas</h2>
+      <div id="achievementsList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+     </div>
+    </div><!-- Settings Page -->
+    <div id="settingsPage" class="page">
+     <div class="p-6">
+      <h2 class="text-3xl font-bold mb-6">Configurações</h2>
+      <div class="space-y-6">
+       <div class="stat-card">
+        <h3 class="text-xl font-bold mb-4">🎨 Tema</h3>
+        <div class="space-y-3">
+         <div class="flex gap-3">
+          <button class="flex-1 py-3 px-4 rounded-lg font-semibold transition-all border-2" id="themeDarkBtn" onclick="setTheme('dark')">
+           ⚡ Turbo
+          </button>
+          <button class="flex-1 py-3 px-4 rounded-lg font-semibold transition-all border-2" id="themeLightBtn" onclick="setTheme('light')">
+           ✨ Minimal
+          </button>
+         </div>
+         <p class="text-xs text-gray-400">Escolha o tema que prefere para o site</p>
+        </div>
+       </div>
+       <div class="stat-card">
+        <h3 class="text-xl font-bold mb-4">Perfil</h3>
+        <div class="space-y-4">
+         <div><label class="block text-sm font-semibold mb-2">Nome</label> <input type="text" placeholder="Seu nome" value="Usuário">
+         </div>
+         <div><label class="block text-sm font-semibold mb-2">Email</label> <input type="email" placeholder="seu@email.com">
+         </div>
+        </div>
+       </div>
+       <div class="stat-card">
+        <h3 class="text-xl font-bold mb-4">Dados</h3>
+        <div class="space-y-3"><button class="btn-secondary">
+          <svg class="inline-block mr-2" width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2V8M8 8L11 11M8 8L5 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /> <path d="M2 11V13C2 13.5523 2.44772 14 3 14H13C13.5523 14 14 13.5523 14 13V11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg> Exportar Dados </button> <button class="btn-secondary btn-danger" onclick="confirmDeleteAllData()">
+          <svg class="inline-block mr-2" width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 4H13M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          </svg> Limpar Todos os Dados </button>
+        </div>
+       </div>
+       <div class="stat-card">
+        <h3 class="text-xl font-bold mb-4">Sobre</h3>
+        <p class="text-gray-400 mb-2">Versão 1.0.0</p>
+        <p class="text-gray-400 text-sm">Sistema de Controle Financeiro Pessoal</p>
+       </div>
+      </div>
+     </div>
+    </div>
+   </main><!-- Transaction Modal -->
+   <div id="transactionModal" class="modal">
+    <div class="modal-content">
+     <div class="flex items-center justify-between mb-6">
+      <h3 class="text-2xl font-bold">Nova Transação</h3><button onclick="closeTransactionModal()" class="text-gray-400 hover:text-white">
+       <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+       </svg></button>
+     </div>
+     <form id="transactionForm" onsubmit="saveTransaction(event)">
+      <div class="space-y-4">
+       <div><label class="block text-sm font-semibold mb-3">Tipo</label>
+        <div class="flex gap-3"><button type="button" id="btnReceita" onclick="selectTransactionType('receita')" class="flex-1 py-3 px-4 rounded-lg border-2 transition-all font-semibold flex items-center justify-center gap-2 btn-transaction-type">
+          <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 15V5M10 5L5 10M10 5L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg> Receita </button> <button type="button" id="btnDespesa" onclick="selectTransactionType('despesa')" class="flex-1 py-3 px-4 rounded-lg border-2 transition-all font-semibold flex items-center justify-center gap-2 btn-transaction-type">
+          <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 5V15M10 15L15 10M10 15L5 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg> Despesa </button>
+        </div><input type="hidden" id="transactionType" name="type" value="receita" required>
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Descrição</label> <input type="text" id="transactionDescription" name="description" required placeholder="Ex: Salário, Aluguel, Compras">
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Valor</label>
+        <div class="flex items-center gap-2"><span class="text-green-500 font-bold text-lg flex-shrink-0">R$</span> <input type="number" id="transactionAmount" name="amount" step="0.01" required placeholder="0,00" class="flex-1"> <button type="button" onclick="openCalculator()" class="text-green-500 hover:text-green-400 transition flex-shrink-0">
+          <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="3" y="2" width="18" height="20" rx="2" stroke="currentColor" stroke-width="1.5" /> <path d="M3 7H21" stroke="currentColor" stroke-width="1.5" /> <circle cx="8" cy="11" r="0.75" fill="currentColor" /> <circle cx="12" cy="11" r="0.75" fill="currentColor" /> <circle cx="16" cy="11" r="0.75" fill="currentColor" /> <circle cx="8" cy="15" r="0.75" fill="currentColor" /> <circle cx="12" cy="15" r="0.75" fill="currentColor" /> <circle cx="16" cy="15" r="0.75" fill="currentColor" /> <circle cx="8" cy="19" r="0.75" fill="currentColor" /> <circle cx="12" cy="19" r="0.75" fill="currentColor" /> <circle cx="16" cy="19" r="0.75" fill="currentColor" />
+          </svg></button>
+        </div>
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Categoria</label> <select id="transactionCategory" name="category" required> </select>
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Data</label> <input type="date" id="transactionDate" name="date" required>
+       </div>
+       <div id="cardSelectionSectionIncome" style="display: none;"><label class="block text-sm font-semibold mb-2">Depositar em (Opcional)</label> <select id="cardSelectionIncome" name="card_id_income"> <option value="">Selecione um cartão</option> </select>
+       </div>
+       <div id="cardSelectionSection" style="display: none;"><label class="block text-sm font-semibold mb-2">Selecione o Cartão</label> <select id="cardSelection" name="card_id"> <option value="">Selecione um cartão</option> </select>
+       </div>
+       <div id="installmentsSection" style="display: none;"><label class="block text-sm font-semibold mb-2">Parcelamento</label> <select id="installments" name="installments" onchange="updateInstallmentSimulation()"> <option value="1">À vista</option> <option value="2">2x</option> <option value="3">3x</option> <option value="4">4x</option> <option value="5">5x</option> <option value="6">6x</option> <option value="7">7x</option> <option value="8">8x</option> <option value="9">9x</option> <option value="10">10x</option> <option value="11">11x</option> <option value="12">12x</option> </select>
+        <div id="installmentSimulation" style="display: none; margin-top: 16px;">
+         <div class="installment-simulation-box">
+          <div class="flex items-center justify-between mb-3">
+           <h4 class="text-sm font-bold installment-title">💰 Simulação</h4><label class="flex items-center gap-2 cursor-pointer"> <input type="checkbox" id="enableInterest" onchange="updateInstallmentSimulation()" class="w-4 h-4 rounded installment-checkbox"> <span class="text-xs installment-label">Aplicar Juros</span> </label>
+          </div>
+          <div id="interestRateSection" style="display: none; margin-bottom: 12px;"><label class="block text-xs font-semibold mb-2 text-gray-300">Taxa de Juros (% ao mês)</label> <input type="number" id="interestRate" step="0.01" value="2.50" placeholder="2.50" onchange="updateInstallmentSimulation()" onfocus="updateInstallmentSimulation()" oninput="updateInstallmentSimulation()" class="w-full text-sm">
+          </div>
+          <div class="space-y-2">
+           <div class="flex items-center justify-between text-sm"><span class="text-gray-400">Valor da parcela:</span> <span id="installmentValue" class="font-bold text-green-500">R$ 0,00</span>
+           </div>
+           <div id="totalWithInterestSection" style="display: none;">
+            <div class="flex items-center justify-between text-sm"><span class="text-gray-400">Total com juros:</span> <span id="totalWithInterest" class="font-bold text-yellow-500">R$ 0,00</span>
+            </div>
+            <div class="flex items-center justify-between text-xs mt-1"><span class="text-gray-500">Juros totais:</span> <span id="totalInterest" class="font-semibold text-red-400">R$ 0,00</span>
+            </div>
+           </div>
+          </div>
+          <div id="installmentSchedule" class="mt-3 pt-3 border-t border-gray-700" style="max-height: 200px; overflow-y: auto;">
+          </div>
+         </div>
+        </div>
+       </div>
+       <div class="flex gap-3 pt-4"><button type="submit" class="btn-primary">Salvar</button> <button type="button" class="btn-secondary" onclick="closeTransactionModal()">Cancelar</button>
+       </div>
+      </div>
+     </form>
+    </div>
+   </div><!-- Card Modal -->
+   <div id="cardModal" class="modal">
+    <div class="modal-content">
+     <div class="flex items-center justify-between mb-6">
+      <h3 class="text-2xl font-bold">Novo Cartão</h3><button onclick="closeCardModal()" class="text-gray-400 hover:text-white">
+       <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+       </svg></button>
+     </div>
+     <form id="cardForm" onsubmit="saveCard(event)">
+      <div class="space-y-4">
+       <div><label class="block text-sm font-semibold mb-2">Nome do Cartão</label> <input type="text" id="cardName" name="name" required placeholder="Ex: Nubank, Itaú">
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Tipo</label> <select id="cardType" name="type" required onchange="toggleCreditCardFields()"> <option value="debito">Débito</option> <option value="credito">Crédito</option> </select>
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Últimos 4 dígitos</label> <input type="text" id="cardLast4" name="last_four" maxlength="4" pattern="[0-9]{4}" placeholder="0000">
+       </div>
+       <div id="creditCardFields" style="display: none;">
+        <div class="space-y-4">
+         <div><label class="block text-sm font-semibold mb-2">Limite (R$)</label> <input type="number" id="cardLimit" name="credit_limit" step="0.01" placeholder="0,00">
+         </div>
+         <div><label class="block text-sm font-semibold mb-2">Dia de Fechamento</label> <input type="number" id="closingDay" name="closing_day" min="1" max="31" placeholder="Ex: 15">
+         </div>
+         <div><label class="block text-sm font-semibold mb-2">Dia de Vencimento</label> <input type="number" id="dueDay" name="due_day" min="1" max="31" placeholder="Ex: 20">
+         </div>
+        </div>
+       </div>
+       <div class="flex gap-3 pt-4"><button type="submit" class="btn-primary">Salvar</button> <button type="button" class="btn-secondary" onclick="closeCardModal()">Cancelar</button>
+       </div>
+      </div>
+     </form>
+    </div>
+   </div><!-- Goal Modal -->
+   <div id="goalModal" class="modal">
+    <div class="modal-content">
+     <div class="flex items-center justify-between mb-6">
+      <h3 class="text-2xl font-bold">Nova Meta</h3><button onclick="closeGoalModal()" class="text-gray-400 hover:text-white">
+       <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+       </svg></button>
+     </div>
+     <form id="goalForm" onsubmit="saveGoal(event)">
+      <div class="space-y-4">
+       <div><label class="block text-sm font-semibold mb-2">Nome da Meta</label> <input type="text" id="goalName" name="name" required placeholder="Ex: Viagem, Carro novo">
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Valor Total (R$)</label> <input type="number" id="goalTarget" name="target_amount" step="0.01" required placeholder="0,00">
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Valor Atual (R$)</label> <input type="number" id="goalCurrent" name="current_amount" step="0.01" value="0" placeholder="0,00">
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Data Limite</label> <input type="date" id="goalDeadline" name="deadline">
+       </div>
+       <div class="flex gap-3 pt-4"><button type="submit" class="btn-primary">Salvar</button> <button type="button" class="btn-secondary" onclick="closeGoalModal()">Cancelar</button>
+       </div>
+      </div>
+     </form>
+    </div>
+   </div><!-- Category Modal -->
+   <div id="categoryModal" class="modal">
+    <div class="modal-content">
+     <div class="flex items-center justify-between mb-6">
+      <h3 class="text-2xl font-bold">Nova Categoria</h3><button onclick="closeCategoryModal()" class="text-gray-400 hover:text-white">
+       <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+       </svg></button>
+     </div>
+     <form id="categoryForm" onsubmit="saveCategory(event)">
+      <div class="space-y-4">
+       <div><label class="block text-sm font-semibold mb-2">Nome da Categoria</label> <input type="text" id="categoryName" name="name" required placeholder="Ex: Streaming, Pets">
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Tipo</label> <select id="categoryType" name="type" required> <option value="despesa">Despesa</option> <option value="receita">Receita</option> </select>
+       </div>
+       <div class="flex gap-3 pt-4"><button type="submit" class="btn-primary">Salvar</button> <button type="button" class="btn-secondary" onclick="closeCategoryModal()">Cancelar</button>
+       </div>
+      </div>
+     </form>
+    </div>
+   </div><!-- Calculator Modal -->
+   <div id="calculatorModal" class="modal">
+    <div class="modal-content max-w-xs">
+     <div class="flex items-center justify-between mb-6">
+      <h3 class="text-2xl font-bold">Calculadora</h3><button onclick="closeCalculator()" class="text-gray-400 hover:text-white">
+       <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+       </svg></button>
+     </div>
+     <div class="space-y-4">
+      <div class="bg-black rounded-lg p-4 text-right">
+       <div id="calcDisplay" class="text-3xl font-bold text-green-500 break-all">
+        0
+       </div>
+      </div>
+      <div class="grid grid-cols-4 gap-2"><button onclick="calcAppend('7')" class="calc-btn">7</button> <button onclick="calcAppend('8')" class="calc-btn">8</button> <button onclick="calcAppend('9')" class="calc-btn">9</button> <button onclick="calcAppend('/')" class="calc-btn calc-btn-operator">÷</button> <button onclick="calcAppend('4')" class="calc-btn">4</button> <button onclick="calcAppend('5')" class="calc-btn">5</button> <button onclick="calcAppend('6')" class="calc-btn">6</button> <button onclick="calcAppend('*')" class="calc-btn calc-btn-operator">×</button> <button onclick="calcAppend('1')" class="calc-btn">1</button> <button onclick="calcAppend('2')" class="calc-btn">2</button> <button onclick="calcAppend('3')" class="calc-btn">3</button> <button onclick="calcAppend('-')" class="calc-btn calc-btn-operator">-</button> <button onclick="calcAppend('0')" class="calc-btn">0</button> <button onclick="calcAppend('.')" class="calc-btn">.</button> <button onclick="calcClear()" class="calc-btn calc-btn-clear">C</button> <button onclick="calcAppend('+')" class="calc-btn calc-btn-operator">+</button> <button onclick="calcEquals()" class="calc-btn calc-btn-equals col-span-4">=</button> <button id="calcSendBtn" onclick="sendCalcResult()" class="calc-btn calc-btn-send col-span-4" style="display: none;">
+        <svg class="inline-block mr-2" width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M2 8H14M14 8L10 4M14 8L10 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        </svg> Enviar Valor </button>
+      </div>
+     </div>
+    </div>
+   </div><!-- Recurring Transaction Modal -->
+   <div id="recurringModal" class="modal">
+    <div class="modal-content">
+     <div class="flex items-center justify-between mb-6">
+      <h3 class="text-2xl font-bold">Nova Transação Recorrente</h3><button onclick="closeRecurringModal()" class="text-gray-400 hover:text-white">
+       <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+       </svg></button>
+     </div>
+     <form id="recurringForm" onsubmit="saveRecurring(event)">
+      <div class="space-y-4">
+       <div><label class="block text-sm font-semibold mb-3">Tipo</label>
+        <div class="flex gap-3"><button type="button" id="btnReceitaRecurring" onclick="selectRecurringType('receita')" class="flex-1 py-3 px-4 rounded-lg border-2 transition-all font-semibold flex items-center justify-center gap-2 btn-income-selected">
+          <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 15V5M10 5L5 10M10 5L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg> Receita </button> <button type="button" id="btnDespesaRecurring" onclick="selectRecurringType('despesa')" class="flex-1 py-3 px-4 rounded-lg border-2 transition-all font-semibold flex items-center justify-center gap-2 btn-recurring-type">
+          <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 5V15M10 15L15 10M10 15L5 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg> Despesa </button>
+        </div><input type="hidden" id="recurringType" name="type" value="receita" required>
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Descrição</label> <input type="text" id="recurringDescription" name="description" required placeholder="Ex: Salário, Conta de Luz">
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Valor</label>
+        <div class="flex items-center gap-2"><span class="text-green-500 font-bold text-lg">R$</span> <input type="number" id="recurringAmount" name="amount" step="0.01" required placeholder="0,00">
+        </div>
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Categoria</label> <select id="recurringCategory" name="category" required> </select>
+       </div>
+       <div id="recurringCardSelectionSectionIncome" style="display: block;"><label class="block text-sm font-semibold mb-2">Depositar em (Opcional)</label> <select id="recurringCardSelectionIncome" name="card_id_income"> <option value="">Nenhum (dinheiro/outro)</option> </select>
+       </div>
+       <div id="recurringCardSelectionSection" style="display: none;"><label class="block text-sm font-semibold mb-2">Selecione o Cartão</label> <select id="recurringCardSelection" name="card_id"> <option value="">Selecione um cartão</option> </select>
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Data de Início</label> <input type="date" id="recurringStartDate" name="start_date" required>
+        <p class="text-xs text-gray-400 mt-1">A partir de quando a recorrência deve começar</p>
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Dia do Mês</label> <input type="number" id="recurringDay" name="day_of_month" min="1" max="31" required placeholder="Ex: 5, 10, 15">
+        <p class="text-xs text-gray-400 mt-1">A transação será criada automaticamente todo dia especificado</p>
+       </div>
+       <div><label class="block text-sm font-semibold mb-3">Duração</label>
+        <div class="flex gap-3"><button type="button" id="btnPermanent" onclick="selectRecurringDuration('permanent')" class="flex-1 py-3 px-4 rounded-lg border-2 transition-all font-semibold btn-duration btn-permanent-selected\"> ♾️ Permanente </button> <button type="button" id="btnTemporary" onclick="selectRecurringDuration('temporary')" class="flex-1 py-3 px-4 rounded-lg border-2 transition-all font-semibold btn-duration\"> 📅 Temporária </button>
+        </div><input type="hidden" id="recurringDuration" name="duration_type" value="permanent" required>
+       </div>
+       <div id="durationMonthsSection" style="display: none;"><label class="block text-sm font-semibold mb-2">Duração (meses)</label> <input type="number" id="durationMonths" name="duration_months" min="1" placeholder="Ex: 6, 12">
+        <p class="text-xs text-gray-400 mt-1">Após este período, a recorrência será automaticamente desativada</p>
+       </div>
+       <div class="flex gap-3 pt-4"><button type="submit" class="btn-primary">Salvar</button> <button type="button" class="btn-secondary" onclick="closeRecurringModal()">Cancelar</button>
+       </div>
+      </div>
+     </form>
+    </div>
+   </div>
+  </div>
+  <script src="main.js"></script>
+</body>
+</html>
