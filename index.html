@@ -113,11 +113,15 @@
       <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.5" /> <circle cx="10" cy="10" r="4" stroke="currentColor" stroke-width="1.5" /> <circle cx="10" cy="10" r="1" fill="currentColor" />
       </svg><span class="font-semibold">Metas</span>
      </div>
-     <div class="sidebar-item achievements-menu-item" onclick="navigateTo('achievements')" data-page="6">
+     <div class="sidebar-item" onclick="navigateTo('simulator')" data-page="6">
+      <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M4 6H16M4 10H16M4 14H10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /> <circle cx="15" cy="15" r="4" fill="none" stroke="currentColor" stroke-width="1.5" /> <path d="M15 12V15M15 15H18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+      </svg><span class="font-semibold">Simulador</span>
+     </div>
+     <div class="sidebar-item achievements-menu-item" onclick="navigateTo('achievements')" data-page="7">
       <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 2L12 7H17L13 10.5L15 16L10 12L5 16L7 10.5L3 7H8L10 2Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" />
       </svg><span class="font-semibold">Conquistas</span>
      </div>
-     <div class="sidebar-item" onclick="navigateTo('settings')" data-page="7">
+     <div class="sidebar-item" onclick="navigateTo('settings')" data-page="8">
       <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="3" stroke="currentColor" stroke-width="1.5" /> <path d="M10 2V4M10 16V18M18 10H16M4 10H2M15.5 4.5L14 6M6 14L4.5 15.5M15.5 15.5L14 14M6 6L4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
       </svg><span class="font-semibold">Configurações</span>
      </div>
@@ -300,6 +304,64 @@
       </div>
       <div id="goalsList"></div>
      </div>
+    </div><!-- Simulator Page -->
+    <div id="simulatorPage" class="page">
+     <div class="p-6">
+      <h2 class="text-3xl font-bold mb-6">Simulador de Investimentos</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+       <!-- Formulário de Simulação -->
+       <div class="stat-card">
+        <h3 class="text-xl font-bold mb-4">Simular Investimento</h3>
+        <div class="space-y-4">
+         <div>
+          <label class="block text-sm font-semibold mb-2">Valor Inicial (R$)</label>
+          <input type="number" id="simulatorInitialValue" step="0.01" placeholder="1.000,00" oninput="calculateSimulationRealtime()" onchange="calculateSimulationRealtime()" class="w-full">
+         </div>
+         <div>
+          <label class="block text-sm font-semibold mb-2">Taxa de Juros (% ao mês)</label>
+          <input type="number" id="simulatorInterestRate" step="0.01" placeholder="0,50" oninput="calculateSimulationRealtime()" onchange="calculateSimulationRealtime()" class="w-full">
+         </div>
+         <div class="grid grid-cols-2 gap-4">
+          <div>
+           <label class="block text-sm font-semibold mb-2">Mês Inicial</label>
+           <input type="month" id="simulatorStartMonth" oninput="calculateSimulationRealtime()" onchange="calculateSimulationRealtime()" class="w-full">
+          </div>
+          <div>
+           <label class="block text-sm font-semibold mb-2">Mês Final</label>
+           <input type="month" id="simulatorEndMonth" oninput="calculateSimulationRealtime()" onchange="calculateSimulationRealtime()" class="w-full">
+          </div>
+         </div>
+        </div>
+       </div>
+       <!-- Resultado da Simulação -->
+       <div class="stat-card">
+        <h3 class="text-xl font-bold mb-4">Resultado</h3>
+        <div class="space-y-4">
+         <div>
+          <p class="text-sm text-gray-400 mb-1">Valor Inicial</p>
+          <p class="text-2xl font-bold text-gray-300">R$ <span id="resultInitialValue">0,00</span></p>
+         </div>
+         <div>
+          <p class="text-sm text-gray-400 mb-1">Juros Ganhos</p>
+          <p class="text-2xl font-bold text-green-500">R$ <span id="resultInterest">0,00</span></p>
+         </div>
+         <div class="border-t border-gray-700 pt-4">
+          <p class="text-sm text-gray-400 mb-1">Valor Final</p>
+          <p class="text-3xl font-bold text-green-500">R$ <span id="resultFinalValue">0,00</span></p>
+         </div>
+         <div>
+          <p class="text-sm text-gray-400 mb-1">Período</p>
+          <p class="text-lg font-semibold text-gray-300"><span id="resultMonths">0</span> meses</p>
+         </div>
+        </div>
+       </div>
+      </div>
+      <!-- Gráfico de Simulação -->
+      <div class="stat-card mt-6">
+       <h3 class="text-xl font-bold mb-4">Evolução do Investimento</h3>
+       <div id="simulationChart"></div>
+      </div>
+     </div>
     </div><!-- Achievements Page -->
     <div id="achievementsPage" class="page">
      <div class="p-6">
@@ -427,6 +489,50 @@
         </div>
        </div>
        <div class="flex gap-3 pt-4"><button type="submit" class="btn-primary">Salvar</button> <button type="button" class="btn-secondary" onclick="closeTransactionModal()">Cancelar</button>
+       </div>
+      </div>
+     </form>
+    </div>
+   </div><!-- Edit Transaction Modal -->
+   <div id="editTransactionModal" class="modal">
+    <div class="modal-content">
+     <div class="flex items-center justify-between mb-6">
+      <h3 class="text-2xl font-bold">Editar Transação</h3><button onclick="closeEditTransactionModal()" class="text-gray-400 hover:text-white">
+       <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+       </svg></button>
+     </div>
+     <form id="editTransactionForm" onsubmit="saveEditTransaction(event)">
+      <div class="space-y-4">
+       <div><label class="block text-sm font-semibold mb-3">Tipo</label>
+        <div class="flex gap-3"><button type="button" id="editBtnReceita" onclick="selectEditTransactionType('receita')" class="flex-1 py-3 px-4 rounded-lg border-2 transition-all font-semibold flex items-center justify-center gap-2 btn-transaction-type">
+          <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 15V5M10 5L5 10M10 5L15 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg> Receita </button> <button type="button" id="editBtnDespesa" onclick="selectEditTransactionType('despesa')" class="flex-1 py-3 px-4 rounded-lg border-2 transition-all font-semibold flex items-center justify-center gap-2 btn-transaction-type">
+          <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 5V15M10 15L15 10M10 15L5 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg> Despesa </button>
+        </div><input type="hidden" id="editTransactionType" name="type" value="receita" required>
+        <input type="hidden" id="editTransactionId" name="id">
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Descrição</label>
+        <div class="relative">
+         <input type="text" id="editTransactionDescription" name="description" required placeholder="Ex: Salário, Aluguel, Compras" autocomplete="off" oninput="handleEditDescriptionInput(event)" onkeydown="handleEditDescriptionKeydown(event)" ontouchstart="setTouchStartX(event)">
+         <div id="editDescriptionSuggestion" class="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-green-600 rounded-lg px-3 py-2 text-sm text-gray-400 cursor-pointer hover:bg-gray-700 transition-colors hidden" onclick="acceptEditSuggestion()">
+          <span id="editSuggestionText"></span>
+         </div>
+        </div>
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Valor</label>
+        <div class="flex items-center gap-2"><span class="text-green-500 font-bold text-lg flex-shrink-0">R$</span> <input type="number" id="editTransactionAmount" name="amount" step="0.01" required placeholder="0,00" class="flex-1">
+        </div>
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Categoria</label>
+        <div class="flex gap-2"><select id="editTransactionCategory" name="category" required class="flex-1"> </select> <button type="button" onclick="openCategoryModalFromTransaction()" class="px-3 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-white font-semibold transition-colors flex items-center justify-center" title="Adicionar nova categoria">
+          <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 5V15M5 10H15" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg></button>
+        </div>
+       </div>
+       <div><label class="block text-sm font-semibold mb-2">Data</label> <input type="date" id="editTransactionDate" name="date" required>
+       </div>
+       <div class="flex gap-3 pt-4"><button type="submit" class="btn-primary">Salvar</button> <button type="button" class="btn-secondary" onclick="closeEditTransactionModal()">Cancelar</button> <button type="button" class="btn-secondary btn-danger" onclick="confirmDeleteEditingTransaction()" style="margin-left: auto;">Deletar</button>
        </div>
       </div>
      </form>
@@ -566,17 +672,35 @@
           </svg> Despesa </button>
         </div><input type="hidden" id="recurringType" name="type" value="receita" required>
        </div>
-       <div><label class="block text-sm font-semibold mb-2">Descrição</label> <input type="text" id="recurringDescription" name="description" required placeholder="Ex: Salário, Conta de Luz">
+       <div><label class="block text-sm font-semibold mb-2">Descrição</label>
+        <div class="relative">
+         <input type="text" id="recurringDescription" name="description" required placeholder="Ex: Salário, Conta de Luz" autocomplete="off" oninput="handleRecurringDescriptionInput(event)" onkeydown="handleRecurringDescriptionKeydown(event)" ontouchstart="setTouchStartX(event)">
+         <div id="recurringDescriptionSuggestion" class="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-green-600 rounded-lg px-3 py-2 text-sm text-gray-400 cursor-pointer hover:bg-gray-700 transition-colors hidden" onclick="acceptRecurringSuggestion()">
+          <span id="recurringSuggestionText"></span>
+         </div>
+        </div>
        </div>
        <div><label class="block text-sm font-semibold mb-2">Valor</label>
         <div class="flex items-center gap-2"><span class="text-green-500 font-bold text-lg">R$</span> <input type="number" id="recurringAmount" name="amount" step="0.01" required placeholder="0,00">
         </div>
        </div>
-       <div><label class="block text-sm font-semibold mb-2">Categoria</label> <select id="recurringCategory" name="category" required> </select>
+       <div><label class="block text-sm font-semibold mb-2">Categoria</label>
+        <div class="flex gap-2"><select id="recurringCategory" name="category" required class="flex-1"> </select> <button type="button" onclick="openCategoryModalFromRecurring()" class="px-3 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-white font-semibold transition-colors flex items-center justify-center" title="Adicionar nova categoria">
+          <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 5V15M5 10H15" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg></button>
+        </div>
        </div>
-       <div id="recurringCardSelectionSectionIncome" style="display: block;"><label class="block text-sm font-semibold mb-2">Depositar em (Opcional)</label> <select id="recurringCardSelectionIncome" name="card_id_income"> <option value="">Nenhum (dinheiro/outro)</option> </select>
+       <div id="recurringCardSelectionSectionIncome" style="display: block;"><label class="block text-sm font-semibold mb-2">Depositar em (Opcional)</label>
+        <div class="flex gap-2"><select id="recurringCardSelectionIncome" name="card_id_income" class="flex-1"> <option value="">Nenhum (dinheiro/outro)</option> </select> <button type="button" onclick="openCardModalFromRecurring()" class="px-3 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-white font-semibold transition-colors flex items-center justify-center" title="Adicionar novo cartão">
+          <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 5V15M5 10H15" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg></button>
+        </div>
        </div>
-       <div id="recurringCardSelectionSection" style="display: none;"><label class="block text-sm font-semibold mb-2">Selecione o Cartão</label> <select id="recurringCardSelection" name="card_id"> <option value="">Selecione um cartão</option> </select>
+       <div id="recurringCardSelectionSection" style="display: none;"><label class="block text-sm font-semibold mb-2">Selecione o Cartão</label>
+        <div class="flex gap-2"><select id="recurringCardSelection" name="card_id" class="flex-1"> <option value="">Selecione um cartão</option> </select> <button type="button" onclick="openCardModalFromRecurring()" class="px-3 py-2 bg-green-600 hover:bg-green-700 rounded-lg text-white font-semibold transition-colors flex items-center justify-center" title="Adicionar novo cartão">
+          <svg width="20" height="20" viewbox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10 5V15M5 10H15" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg></button>
+        </div>
        </div>
        <div><label class="block text-sm font-semibold mb-2">Data de Início</label> <input type="date" id="recurringStartDate" name="start_date" required>
         <p class="text-xs text-gray-400 mt-1">A partir de quando a recorrência deve começar</p>
@@ -585,7 +709,7 @@
         <p class="text-xs text-gray-400 mt-1">A transação será criada automaticamente todo dia especificado</p>
        </div>
        <div><label class="block text-sm font-semibold mb-3">Duração</label>
-        <div class="flex gap-3"><button type="button" id="btnPermanent" onclick="selectRecurringDuration('permanent')" class="flex-1 py-3 px-4 rounded-lg border-2 transition-all font-semibold btn-duration btn-permanent-selected\"> ♾️ Permanente </button> <button type="button" id="btnTemporary" onclick="selectRecurringDuration('temporary')" class="flex-1 py-3 px-4 rounded-lg border-2 transition-all font-semibold btn-duration\"> 📅 Temporária </button>
+        <div class="flex gap-3"><button type="button" id="btnPermanent" onclick="selectRecurringDuration('permanent')" class="flex-1 py-3 px-4 rounded-lg border-2 transition-all font-semibold btn-duration"> ♾️ Permanente </button> <button type="button" id="btnTemporary" onclick="selectRecurringDuration('temporary')" class="flex-1 py-3 px-4 rounded-lg border-2 transition-all font-semibold btn-duration"> 📅 Temporária </button>
         </div><input type="hidden" id="recurringDuration" name="duration_type" value="permanent" required>
        </div>
        <div id="durationMonthsSection" style="display: none;"><label class="block text-sm font-semibold mb-2">Duração (meses)</label> <input type="number" id="durationMonths" name="duration_months" min="1" placeholder="Ex: 6, 12">

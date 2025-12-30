@@ -14,8 +14,8 @@
     let currentUser = null;
     let currentSession = null;
     
-    // Flag para rastrear se modal foi aberto do contexto de transação
-    let openedFromTransaction = false;
+    // Flag para rastrear de qual modal foi aberto (transaction, recurring, ou null)
+    let openedFromModal = null;
     
     // Flag para rastrear se o usuário é admin
     let isCurrentUserAdmin = false;
@@ -590,6 +590,134 @@
       currentPage = page;
 
       updateUI();
+    }
+
+    function calculateSimulation() {
+      const initialValue = parseFloat(document.getElementById('simulatorInitialValue').value);
+      const interestRate = parseFloat(document.getElementById('simulatorInterestRate').value);
+      const startMonth = document.getElementById('simulatorStartMonth').value;
+      const endMonth = document.getElementById('simulatorEndMonth').value;
+
+      // Validação
+      if (!initialValue || isNaN(initialValue) || initialValue <= 0) {
+        showToast('Digite um valor inicial válido.', 'error');
+        return;
+      }
+
+      if (!interestRate || isNaN(interestRate) || interestRate < 0) {
+        showToast('Digite uma taxa de juros válida.', 'error');
+        return;
+      }
+
+      if (!startMonth || !endMonth) {
+        showToast('Selecione o período (data inicial e final).', 'error');
+        return;
+      }
+
+      // Calcular número de meses
+      const start = new Date(startMonth);
+      const end = new Date(endMonth);
+      const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+
+      if (monthsDiff < 0) {
+        showToast('A data final deve ser posterior à data inicial.', 'error');
+        return;
+      }
+
+      // Calcular juros compostos: VF = VI * (1 + i)^n
+      const rate = interestRate / 100;
+      const finalValue = initialValue * Math.pow(1 + rate, monthsDiff);
+      const interestGained = finalValue - initialValue;
+
+      // Atualizar resultados
+      document.getElementById('resultInitialValue').textContent = formatCurrency(initialValue);
+      document.getElementById('resultInterest').textContent = formatCurrency(interestGained);
+      document.getElementById('resultFinalValue').textContent = formatCurrency(finalValue);
+      document.getElementById('resultMonths').textContent = monthsDiff;
+
+      // Gerar dados para o gráfico
+      generateSimulationChart(initialValue, rate, monthsDiff);
+
+      showToast('Simulação calculada com sucesso!', 'success');
+    }
+
+    function calculateSimulationRealtime() {
+      const initialValue = parseFloat(document.getElementById('simulatorInitialValue').value) || 0;
+      const interestRate = parseFloat(document.getElementById('simulatorInterestRate').value) || 0;
+      const startMonth = document.getElementById('simulatorStartMonth').value;
+      const endMonth = document.getElementById('simulatorEndMonth').value;
+
+      // Se não houver dados completos, limpar os resultados
+      if (initialValue <= 0 || interestRate < 0 || !startMonth || !endMonth) {
+        document.getElementById('resultInitialValue').textContent = '0,00';
+        document.getElementById('resultInterest').textContent = '0,00';
+        document.getElementById('resultFinalValue').textContent = '0,00';
+        document.getElementById('resultMonths').textContent = '0';
+        document.getElementById('simulationChart').innerHTML = '';
+        return;
+      }
+
+      // Calcular número de meses
+      const start = new Date(startMonth);
+      const end = new Date(endMonth);
+      const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+
+      if (monthsDiff < 0) {
+        document.getElementById('resultInitialValue').textContent = '0,00';
+        document.getElementById('resultInterest').textContent = '0,00';
+        document.getElementById('resultFinalValue').textContent = '0,00';
+        document.getElementById('resultMonths').textContent = '0';
+        document.getElementById('simulationChart').innerHTML = '';
+        return;
+      }
+
+      // Calcular juros compostos: VF = VI * (1 + i)^n
+      const rate = interestRate / 100;
+      const finalValue = initialValue * Math.pow(1 + rate, monthsDiff);
+      const interestGained = finalValue - initialValue;
+
+      // Atualizar resultados
+      document.getElementById('resultInitialValue').textContent = formatCurrency(initialValue);
+      document.getElementById('resultInterest').textContent = formatCurrency(interestGained);
+      document.getElementById('resultFinalValue').textContent = formatCurrency(finalValue);
+      document.getElementById('resultMonths').textContent = monthsDiff;
+
+      // Gerar dados para o gráfico
+      generateSimulationChart(initialValue, rate, monthsDiff);
+    }
+
+    function generateSimulationChart(initialValue, rate, months) {
+      const chartContainer = document.getElementById('simulationChart');
+      const data = [];
+      
+      for (let i = 0; i <= months; i++) {
+        const value = initialValue * Math.pow(1 + rate, i);
+        data.push({ month: i, value: value });
+      }
+
+      // Criar uma visualização simples com barras
+      let html = '<div class="overflow-x-auto"><div class="flex gap-1" style="height: 300px; align-items: flex-end;">';
+      
+      const maxValue = data[data.length - 1].value;
+      const minValue = initialValue;
+      const range = maxValue - minValue;
+
+      data.forEach((item, index) => {
+        const percentage = ((item.value - minValue) / range) * 100;
+        const tooltipValue = formatCurrency(item.value);
+        html += `
+          <div class="flex-1 bg-gradient-to-t from-green-500 to-green-400 rounded-t transition-all hover:from-green-600 hover:to-green-500 cursor-pointer relative group" 
+               style="height: ${percentage}%; min-height: 20px;" 
+               title="Mês ${item.month}: ${tooltipValue}">
+            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
+              Mês ${item.month}: ${tooltipValue}
+            </div>
+          </div>
+        `;
+      });
+
+      html += '</div></div>';
+      chartContainer.innerHTML = html;
     }
 
     function updateUI() {
@@ -1232,6 +1360,12 @@
               <div class="text-right flex items-center gap-3">
                 <p class="${color} text-xl font-bold">${isIncome ? '+' : isCreditPurchase ? '' : '-'} ${formatCurrency(t.amount)}</p>
                 ${!isProjected ? `
+                  <button onclick="openEditTransactionModal(${t.id})" class="text-blue-500 hover:text-blue-400 transition p-2 hover:bg-blue-900 hover:bg-opacity-20 rounded" title="Editar transação">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M3 17.25V19H5.25L15.8133 8.43671L13.5633 6.18671L3 16.75V17.25Z" fill="currentColor"/>
+                      <path d="M19.8042 6.13542L13.8654 0.196523C13.5757 -0.0931187 13.1262 -0.0931187 12.8365 0.196523L11.4719 1.56108C11.1822 1.85065 11.1822 2.30015 11.4719 2.58972L17.4108 8.52862C17.7004 8.81819 18.1499 8.81819 18.4396 8.52862L19.8042 7.16406C20.0939 6.87449 20.0939 6.42499 19.8042 6.13542Z" fill="currentColor"/>
+                    </svg>
+                  </button>
                   <button onclick="deleteTransaction(${t.id}, '${t.description.replace(/'/g, "\\'")}', ${t.installments}, ${t.current_installment})" class="text-red-500 hover:text-red-400 transition p-2 hover:bg-red-900 hover:bg-opacity-20 rounded" title="Excluir transação">
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M3 5H17M15 5V16C15 16.5523 14.5523 17 14 17H6C5.44772 17 5 16.5523 5 16V5M7 5V4C7 3.44772 7.44772 3 8 3H12C12.5523 3 13 3.44772 13 4V5M8 9V13M12 9V13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -1736,6 +1870,7 @@
     }
 
     function openRecurringModal() {
+      buildDescriptionSuggestions();
       document.getElementById('recurringModal').classList.add('active');
       selectRecurringType('receita');
       selectRecurringDuration('permanent');
@@ -1809,18 +1944,18 @@
       
       if (durationType === 'permanent') {
         btnPermanent.classList.add('btn-permanent-selected');
-        btnPermanent.classList.remove('btn-duration');
+        btnPermanent.classList.remove('btn-temporary-selected');
         
         btnTemporary.classList.remove('btn-permanent-selected');
-        btnTemporary.classList.add('btn-duration');
+        btnTemporary.classList.add('btn-temporary-selected');
         
         monthsSection.style.display = 'none';
       } else {
         btnTemporary.classList.add('btn-permanent-selected');
-        btnTemporary.classList.remove('btn-duration');
+        btnTemporary.classList.remove('btn-temporary-selected');
         
         btnPermanent.classList.remove('btn-permanent-selected');
-        btnPermanent.classList.add('btn-duration');
+        btnPermanent.classList.add('btn-temporary-selected');
         
         monthsSection.style.display = 'block';
       }
@@ -1836,6 +1971,27 @@
     }
 
     function updateRecurringCardOptions() {
+      const select = document.getElementById('recurringCardSelection');
+      
+      select.innerHTML = '<option value="">Selecione um cartão</option>' +
+        cards.map(c => {
+          const typeLabel = c.type === 'credito' ? '💳 Crédito' : '💳 Débito';
+          let infoLabel = '';
+          
+          if (c.type === 'credito') {
+            const used = calculateCardUsage(c.id);
+            const available = c.credit_limit - used;
+            infoLabel = ` - Disponível: ${formatCurrency(available)}`;
+          } else {
+            const balance = calculateDebitCardBalance(c.id);
+            infoLabel = ` - Saldo: ${formatCurrency(balance)}`;
+          }
+          
+          return `<option value="${c.id}">${c.name} ${typeLabel}${infoLabel}</option>`;
+        }).join('');
+    }
+
+    function updateRecurringCardSelectionOptions() {
       const select = document.getElementById('recurringCardSelection');
       
       select.innerHTML = '<option value="">Selecione um cartão</option>' +
@@ -1927,20 +2083,21 @@
         }
 
         showToast('Transação recorrente cadastrada com sucesso!', 'success');
-        closeRecurringModal();
+        
+        // Reabilitar botão após sucesso
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        
         await loadData();
         updateUI();
+        closeRecurringModal();
       } catch (error) {
         console.error('Error saving recurring transaction:', error);
         showToast('Erro ao cadastrar transação recorrente. Verifique os dados e tente novamente.', 'error');
         
         // Reabilitar botão em caso de erro
-        const form = document.getElementById('recurringForm');
-        const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Salvar';
-        }
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
       }
     }
 
@@ -2356,7 +2513,245 @@
       }
     }
 
+    function openEditTransactionModal(transactionId) {
+      buildDescriptionSuggestions();
+      const transaction = transactions.find(t => t.id === transactionId);
+      
+      if (!transaction) {
+        showToast('Transação não encontrada.', 'error');
+        return;
+      }
+
+      // Preencher os campos do formulário
+      document.getElementById('editTransactionId').value = transactionId;
+      document.getElementById('editTransactionType').value = transaction.type;
+      document.getElementById('editTransactionDescription').value = transaction.description;
+      document.getElementById('editTransactionAmount').value = transaction.amount;
+      document.getElementById('editTransactionDate').value = transaction.date;
+
+      // Atualizar o title do modal
+      const modal = document.getElementById('editTransactionModal');
+      const title = modal.querySelector('h3');
+      title.textContent = 'Editar Transação';
+
+      // Selecionar o tipo correto (isto popula o dropdown de categorias)
+      selectEditTransactionType(transaction.type);
+      
+      // Agora atribuir a categoria após o dropdown estar preenchido
+      document.getElementById('editTransactionCategory').value = transaction.category;
+      
+      // Mostrar o modal
+      document.getElementById('editTransactionModal').classList.add('active');
+    }
+
+    function closeEditTransactionModal() {
+      document.getElementById('editTransactionModal').classList.remove('active');
+      document.getElementById('editTransactionForm').reset();
+      const btnReceita = document.getElementById('editBtnReceita');
+      const btnDespesa = document.getElementById('editBtnDespesa');
+      if (btnReceita && btnDespesa) {
+        selectEditTransactionType('receita');
+      }
+    }
+
+    function selectEditTransactionType(type) {
+      const btnReceita = document.getElementById('editBtnReceita');
+      const btnDespesa = document.getElementById('editBtnDespesa');
+      const hiddenInput = document.getElementById('editTransactionType');
+      
+      if (!btnReceita || !btnDespesa || !hiddenInput) {
+        return;
+      }
+      
+      hiddenInput.value = type;
+      
+      if (type === 'receita') {
+        btnReceita.classList.add('btn-income-selected');
+        btnReceita.classList.remove('btn-transaction-type');
+        
+        btnDespesa.classList.remove('btn-expense-selected');
+        btnDespesa.classList.add('btn-transaction-type');
+      } else {
+        btnDespesa.classList.add('btn-expense-selected');
+        btnDespesa.classList.remove('btn-transaction-type');
+        
+        btnReceita.classList.remove('btn-income-selected');
+        btnReceita.classList.add('btn-transaction-type');
+      }
+      
+      updateEditCategoryOptions();
+    }
+
+    function handleEditDescriptionInput(e) {
+      const input = e.target;
+      const value = input.value.trim();
+      const suggestionDiv = document.getElementById('editDescriptionSuggestion');
+      const suggestionText = document.getElementById('editSuggestionText');
+
+      if (value.length === 0) {
+        suggestionDiv.classList.add('hidden');
+        return;
+      }
+
+      // Buscar descrições (primeiro de transações anteriores, depois da biblioteca padrão)
+      const suggestion = allDescriptions.find(desc => 
+        desc.toLowerCase().startsWith(value.toLowerCase()) && desc.toLowerCase() !== value.toLowerCase()
+      );
+
+      if (suggestion) {
+        // Mostrar sugestão
+        suggestionText.textContent = suggestion;
+        suggestionDiv.classList.remove('hidden');
+
+        // Adicionar suporte a swipe à direita no mobile
+        suggestionDiv.ontouchend = (touchEvent) => {
+          const touchEndX = touchEvent.changedTouches[0].clientX;
+          const diff = touchEndX - touchStartX;
+          
+          // Se deslizou mais de 50px para a direita, aceita
+          if (diff > 50) {
+            e.preventDefault();
+            acceptEditSuggestion();
+          }
+        };
+      } else {
+        suggestionDiv.classList.add('hidden');
+      }
+    }
+
+    function handleEditDescriptionKeydown(e) {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        acceptEditSuggestion();
+      }
+    }
+
+    function acceptEditSuggestion() {
+      const input = document.getElementById('editTransactionDescription');
+      const suggestionDiv = document.getElementById('editDescriptionSuggestion');
+      const suggestionText = document.getElementById('editSuggestionText').textContent;
+
+      if (suggestionText) {
+        input.value = suggestionText;
+        suggestionDiv.classList.add('hidden');
+        input.focus();
+      }
+    }
+
+    async function saveEditTransaction(e) {
+      e.preventDefault();
+      
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      if (submitBtn.disabled) return;
+      
+      submitBtn.disabled = true;
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = 'Salvando...';
+      
+      const transactionId = parseInt(document.getElementById('editTransactionId').value);
+      const type = document.getElementById('editTransactionType').value;
+      const description = document.getElementById('editTransactionDescription').value;
+      const amount = parseFloat(document.getElementById('editTransactionAmount').value);
+      const category = document.getElementById('editTransactionCategory').value;
+      const date = document.getElementById('editTransactionDate').value;
+      
+      try {
+        const { error } = await supabaseClient
+          .from('transactions')
+          .update({
+            type: type,
+            description: description,
+            amount: amount,
+            category: category,
+            date: date
+          })
+          .eq('id', transactionId);
+        
+        if (error) throw error;
+
+        showToast('Transação atualizada com sucesso!', 'success');
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        
+        closeEditTransactionModal();
+        await loadData();
+        updateUI();
+      } catch (error) {
+        console.error('Error saving transaction:', error);
+        showToast('Erro ao atualizar transação. Tente novamente.', 'error');
+        
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
+    }
+
+    function confirmDeleteEditingTransaction() {
+      const transactionId = parseInt(document.getElementById('editTransactionId').value);
+      const description = document.getElementById('editTransactionDescription').value;
+      const amount = parseFloat(document.getElementById('editTransactionAmount').value);
+      
+      closeEditTransactionModal();
+      deleteTransaction(transactionId, description, 1, 1);
+    }
+
+    function handleRecurringDescriptionInput(e) {
+      const input = e.target;
+      const value = input.value.trim();
+      const suggestionDiv = document.getElementById('recurringDescriptionSuggestion');
+      const suggestionText = document.getElementById('recurringSuggestionText');
+
+      if (value.length === 0) {
+        suggestionDiv.classList.add('hidden');
+        return;
+      }
+
+      // Buscar descrições (primeiro de transações anteriores, depois da biblioteca padrão)
+      const suggestion = allDescriptions.find(desc => 
+        desc.toLowerCase().startsWith(value.toLowerCase()) && desc.toLowerCase() !== value.toLowerCase()
+      );
+
+      if (suggestion) {
+        // Mostrar sugestão
+        suggestionText.textContent = suggestion;
+        suggestionDiv.classList.remove('hidden');
+
+        // Adicionar suporte a swipe à direita no mobile
+        suggestionDiv.ontouchend = (touchEvent) => {
+          const touchEndX = touchEvent.changedTouches[0].clientX;
+          const diff = touchEndX - touchStartX;
+          
+          // Se deslizou mais de 50px para a direita, aceita
+          if (diff > 50) {
+            e.preventDefault();
+            acceptRecurringSuggestion();
+          }
+        };
+      } else {
+        suggestionDiv.classList.add('hidden');
+      }
+    }
+
+    function handleRecurringDescriptionKeydown(e) {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        acceptRecurringSuggestion();
+      }
+    }
+
+    function acceptRecurringSuggestion() {
+      const input = document.getElementById('recurringDescription');
+      const suggestionDiv = document.getElementById('recurringDescriptionSuggestion');
+      const suggestionText = document.getElementById('recurringSuggestionText').textContent;
+
+      if (suggestionText) {
+        input.value = suggestionText;
+        suggestionDiv.classList.add('hidden');
+        input.focus();
+      }
+    }
+
     function selectTransactionType(type) {
+
       const btnReceita = document.getElementById('btnReceita');
       const btnDespesa = document.getElementById('btnDespesa');
       const hiddenInput = document.getElementById('transactionType');
@@ -2732,6 +3127,15 @@
       select.innerHTML = filteredCategories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
     }
 
+    function updateEditCategoryOptions() {
+      const select = document.getElementById('editTransactionCategory');
+      const type = document.getElementById('editTransactionType').value;
+      
+      const filteredCategories = categories.filter(c => c.type === type);
+
+      select.innerHTML = filteredCategories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+    }
+
     async function saveTransaction(e) {
       e.preventDefault();
       
@@ -2855,8 +3259,7 @@
     }
 
     function openCategoryModalFromTransaction() {
-      openedFromTransaction = true;
-      document.getElementById('transactionModal').classList.remove('active');
+      openedFromModal = 'transaction';
       document.getElementById('categoryModal').classList.add('active');
       
       // Limpar o formulário de categoria
@@ -2872,8 +3275,7 @@
     }
 
     function openCardModalFromTransaction() {
-      openedFromTransaction = true;
-      document.getElementById('transactionModal').classList.remove('active');
+      openedFromModal = 'transaction';
       document.getElementById('cardModal').classList.add('active');
       
       // Limpar o formulário de cartão
@@ -2884,31 +3286,68 @@
     function closeCategoryModalAndReturnToTransaction() {
       document.getElementById('categoryModal').classList.remove('active');
       document.getElementById('categoryForm').reset();
-      document.getElementById('transactionModal').classList.add('active');
       updateCategoryOptions();
     }
 
     function closeCardModalAndReturnToTransaction() {
       document.getElementById('cardModal').classList.remove('active');
       document.getElementById('cardForm').reset();
-      document.getElementById('transactionModal').classList.add('active');
       updateCardSelectionOptions();
       updateIncomeCardOptions();
+    }
+
+    function openCategoryModalFromRecurring() {
+      openedFromModal = 'recurring';
+      document.getElementById('categoryModal').classList.add('active');
+      
+      // Limpar o formulário de categoria
+      document.getElementById('categoryForm').reset();
+      
+      // Definir para Despesa por padrão (vindo de transação de despesa)
+      const recurringType = document.getElementById('recurringType').value;
+      if (recurringType === 'receita') {
+        document.getElementById('categoryType').value = 'receita';
+      } else {
+        document.getElementById('categoryType').value = 'despesa';
+      }
+    }
+
+    function openCardModalFromRecurring() {
+      openedFromModal = 'recurring';
+      document.getElementById('cardModal').classList.add('active');
+      
+      // Limpar o formulário de cartão
+      document.getElementById('cardForm').reset();
+      toggleCreditCardFields();
+    }
+
+    function closeCategoryModalAndReturnToRecurring() {
+      document.getElementById('categoryModal').classList.remove('active');
+      document.getElementById('categoryForm').reset();
+      updateRecurringCategoryOptions();
+    }
+
+    function closeCardModalAndReturnToRecurring() {
+      document.getElementById('cardModal').classList.remove('active');
+      document.getElementById('cardForm').reset();
+      updateRecurringCardSelectionOptions();
+      updateRecurringIncomeCardOptions();
     }
 
     function openCategoryModal() {
       document.getElementById('categoryModal').classList.add('active');
     }
 
+    function openCardModal() {
+      openedFromModal = null;
+      document.getElementById('cardModal').classList.add('active');
+      document.getElementById('cardForm').reset();
+      toggleCreditCardFields();
+    }
+
     function closeCardModal() {
       document.getElementById('cardModal').classList.remove('active');
       document.getElementById('cardForm').reset();
-      
-      // Se foi aberto do modal de transação, retornar para lá
-      if (openedFromTransaction) {
-        document.getElementById('transactionModal').classList.add('active');
-        openedFromTransaction = false;
-      }
     }
 
     function toggleCreditCardFields() {
@@ -3041,15 +3480,18 @@
         
         // Reabilitar botão após sucesso
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Salvar';
+        submitBtn.textContent = originalText;
         
         await loadData();
         updateUI();
         
-        // Se foi aberto do modal de transação, retornar para lá
-        if (openedFromTransaction) {
-          openedFromTransaction = false;
+        // Se foi aberto de um modal, retornar para lá
+        if (openedFromModal === 'transaction') {
+          openedFromModal = null;
           closeCardModalAndReturnToTransaction();
+        } else if (openedFromModal === 'recurring') {
+          openedFromModal = null;
+          closeCardModalAndReturnToRecurring();
         } else {
           closeCardModal();
         }
@@ -3059,7 +3501,7 @@
         
         // Reabilitar botão em caso de erro
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Salvar';
+        submitBtn.textContent = originalText;
       }
     }
 
@@ -3098,20 +3540,21 @@
         if (error) throw error;
 
         showToast('Meta cadastrada com sucesso!', 'success');
-        closeGoalModal();
+        
+        // Reabilitar botão após sucesso
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        
         await loadData();
         updateUI();
+        closeGoalModal();
       } catch (error) {
         console.error('Error saving goal:', error);
         showToast('Erro ao cadastrar meta. Tente novamente.', 'error');
         
         // Reabilitar botão em caso de erro
-        const form = document.getElementById('goalForm');
-        const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Salvar';
-        }
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
       }
     }
 
@@ -3439,15 +3882,18 @@
         
         // Reabilitar botão após sucesso
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Salvar';
+        submitBtn.textContent = originalText;
         
         await loadData();
         updateUI();
         
-        // Se foi aberto do modal de transação, retornar para lá
-        if (openedFromTransaction) {
-          openedFromTransaction = false;
+        // Se foi aberto de um modal, retornar para lá
+        if (openedFromModal === 'transaction') {
+          openedFromModal = null;
           closeCategoryModalAndReturnToTransaction();
+        } else if (openedFromModal === 'recurring') {
+          openedFromModal = null;
+          closeCategoryModalAndReturnToRecurring();
         } else {
           closeCategoryModal();
         }
@@ -3457,7 +3903,7 @@
         
         // Reabilitar botão em caso de erro
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Salvar';
+        submitBtn.textContent = originalText;
       }
     }
 

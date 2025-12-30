@@ -248,6 +248,12 @@
       display: flex;
     }
 
+    /* Modais de sobreposição (categoria e cartão) ficam acima dos modais principais */
+    #categoryModal,
+    #cardModal {
+      z-index: 1000 !important;
+    }
+
     .modal-content {
       background: #0a0a0a;
       border: 1px solid #2a2a2a;
@@ -648,7 +654,8 @@
       background: transparent;
       border-color: #2a2a2a;
       color: #888;
-      transition: all 0.3s;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
     }
 
     html[data-theme="light"] .btn-transaction-type,
@@ -657,34 +664,57 @@
       border-color: #d5dce0;
       color: #7f8c8d;
       background: transparent;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .btn-income-selected,
     .btn-permanent-selected {
-      background: rgba(16, 185, 129, 0.1);
+      background: rgba(16, 185, 129, 0.15);
       border-color: #10b981;
       color: #10b981;
+      transform: scale(1.02);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .btn-expense-selected,
-    .btn-temporary-selected {
-      background: rgba(239, 68, 68, 0.1);
+    .btn-expense-selected {
+      background: rgba(239, 68, 68, 0.15);
       border-color: #ef4444;
       color: #ef4444;
+      transform: scale(1.02);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .btn-temporary-selected {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: #f59e0b;
+      color: #f59e0b;
+      transform: scale(1.02);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     html[data-theme="light"] .btn-income-selected,
     html[data-theme="light"] .btn-permanent-selected {
-      background: rgba(59, 130, 246, 0.1);
+      background: rgba(59, 130, 246, 0.15);
       border-color: #3b82f6;
       color: #3b82f6;
+      transform: scale(1.02);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    html[data-theme="light"] .btn-expense-selected,
-    html[data-theme="light"] .btn-temporary-selected {
-      background: rgba(239, 68, 68, 0.1);
+    html[data-theme="light"] .btn-expense-selected {
+      background: rgba(239, 68, 68, 0.15);
       border-color: #ef4444;
       color: #ef4444;
+      transform: scale(1.02);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    html[data-theme="light"] .btn-temporary-selected {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: #f59e0b;
+      color: #f59e0b;
+      transform: scale(1.02);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     /* Installment Simulation Box */
@@ -1031,4 +1061,35 @@
       .grid {
         gap: 12px !important;
       }
+    }
+
+    /* Botões de adição de categoria/cartão */
+    button[onclick*="openCategoryModalFromTransaction"],
+    button[onclick*="openCardModalFromTransaction"],
+    button[onclick*="openCategoryModalFromRecurring"],
+    button[onclick*="openCardModalFromRecurring"] {
+      background: #10b981 !important;
+      color: #ffffff !important;
+    }
+
+    button[onclick*="openCategoryModalFromTransaction"]:hover,
+    button[onclick*="openCardModalFromTransaction"]:hover,
+    button[onclick*="openCategoryModalFromRecurring"]:hover,
+    button[onclick*="openCardModalFromRecurring"]:hover {
+      background: #059669 !important;
+    }
+
+    html[data-theme="light"] button[onclick*="openCategoryModalFromTransaction"],
+    html[data-theme="light"] button[onclick*="openCardModalFromTransaction"],
+    html[data-theme="light"] button[onclick*="openCategoryModalFromRecurring"],
+    html[data-theme="light"] button[onclick*="openCardModalFromRecurring"] {
+      background: #10b981 !important;
+      color: #ffffff !important;
+    }
+
+    html[data-theme="light"] button[onclick*="openCategoryModalFromTransaction"]:hover,
+    html[data-theme="light"] button[onclick*="openCardModalFromTransaction"]:hover,
+    html[data-theme="light"] button[onclick*="openCategoryModalFromRecurring"]:hover,
+    html[data-theme="light"] button[onclick*="openCardModalFromRecurring"]:hover {
+      background: #059669 !important;
     }
