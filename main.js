@@ -13,6 +13,12 @@
     // Estado de autenticação
     let currentUser = null;
     let currentSession = null;
+    
+    // Flag para rastrear se modal foi aberto do contexto de transação
+    let openedFromTransaction = false;
+    
+    // Flag para rastrear se o usuário é admin
+    let isCurrentUserAdmin = false;
 
     // State
     let transactions = [];
@@ -81,11 +87,11 @@
         
         if (error) throw error;
         
-        const isAdmin = data?.is_admin || false;
+        isCurrentUserAdmin = data?.is_admin || false;
         const themeBtn = document.getElementById('themeToggleBtn');
         
         if (themeBtn) {
-          if (isAdmin) {
+          if (isCurrentUserAdmin) {
             themeBtn.style.display = 'flex';
           } else {
             themeBtn.style.display = 'none';
@@ -93,6 +99,7 @@
         }
       } catch (error) {
         console.error('Erro ao verificar status de admin:', error);
+        isCurrentUserAdmin = false;
         // Esconder botão de tema se houver erro
         const themeBtn = document.getElementById('themeToggleBtn');
         if (themeBtn) themeBtn.style.display = 'none';
@@ -601,6 +608,55 @@
       updateCategoryOptions();
     }
 
+    // Função para animar números subindo ou descendo
+    function animateNumber(element, finalValue, isIncome, duration = 500) {
+      const currentValue = parseFloat(element.dataset.value) || 0;
+      element.dataset.value = finalValue;
+      
+      const startTime = Date.now();
+      const diff = finalValue - currentValue;
+      
+      const animate = () => {
+        const elapsed = Date.now() - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        const currentDisplayValue = currentValue + (diff * progress);
+        
+        // Extrair apenas a parte numérica para animação visual
+        const formattedValue = formatCurrency(currentDisplayValue);
+        
+        // Se o elemento tem HTML (projeção), preservar a parte do HTML
+        if (element.innerHTML.includes('<span')) {
+          const htmlPart = element.innerHTML.substring(element.innerHTML.indexOf('<span'));
+          element.innerHTML = formattedValue + ' ' + htmlPart;
+        } else {
+          element.textContent = formattedValue;
+        }
+        
+        // Adicionar classe visual para animação (suave escala)
+        if (progress === 0) {
+          element.style.transform = 'scale(1)';
+        } else if (progress < 0.3) {
+          // Animar do valor para cima/baixo (receita sobe, despesa desce)
+          const scale = 1 + (isIncome ? -0.1 : 0.1) * (progress / 0.3);
+          element.style.transform = `scale(${scale})`;
+          element.style.transition = 'none';
+        } else {
+          element.style.transform = 'scale(1)';
+          element.style.transition = 'transform 0.2s ease-out';
+        }
+        
+        if (progress < 1) {
+          requestAnimationFrame(animate);
+        } else {
+          element.style.transform = 'scale(1)';
+          element.style.transition = 'none';
+        }
+      };
+      
+      animate();
+    }
+
     function updateStats() {
       const viewMonth = currentViewDate.getMonth();
       const viewYear = currentViewDate.getFullYear();
@@ -616,14 +672,14 @@
       // Calcula saldo acumulado de TODOS os meses ANTERIORES ao visualizado (APENAS transações reais)
       let accumulatedBalance = 0;
       
-      // Filtra TODAS as transações ANTERIORES ao mês visualizado
+      // Filtra TODAS as transações ANTERIORES ao mês visualizado (excluindo ajustes)
       const viewMonthKey = viewYear * 12 + viewMonth;
       const currentMonthKey = currentYear * 12 + currentMonth;
       
       const previousTransactions = transactions.filter(t => {
         const tDate = new Date(t.date + 'T00:00:00');
         const transactionMonthKey = tDate.getFullYear() * 12 + tDate.getMonth();
-        return transactionMonthKey < viewMonthKey;
+        return transactionMonthKey < viewMonthKey && t.type !== 'ajuste';
       });
 
       // Calcula saldo acumulado (receitas - despesas não-crédito - pagamentos de fatura)
@@ -658,10 +714,10 @@
         }
       }
 
-      // Transações REAIS do mês visualizado
+      // Transações REAIS do mês visualizado (excluindo ajustes)
       const monthTransactions = transactions.filter(t => {
         const tDate = new Date(t.date + 'T00:00:00');
-        return tDate.getMonth() === viewMonth && tDate.getFullYear() === viewYear;
+        return tDate.getMonth() === viewMonth && tDate.getFullYear() === viewYear && t.type !== 'ajuste';
       });
 
       // Recorrências do mês visualizado (separadas em reais e projetadas)
@@ -720,7 +776,14 @@
 
       // Saldo real do mês (só desconta despesas não-crédito)
       const monthBalance = realIncome - realExpensesForBalance;
-      const totalBalance = accumulatedBalance + monthBalance;
+      let totalBalance = accumulatedBalance + monthBalance;
+      
+      // Aplicar ajuste manual se existir
+      const adjustments = JSON.parse(localStorage.getItem('manualBalanceAdjustments') || '{}');
+      if (adjustments[currentUser.id] !== undefined) {
+        // Se há ajuste manual, ele define o saldo total
+        totalBalance = adjustments[currentUser.id];
+      }
 
       // Para o mês ATUAL ou FUTURO, mostra projeções SEPARADAMENTE (apenas futuras)
       let projectedIncome = 0;
@@ -757,13 +820,34 @@
         // Para meses futuros, sempre mostra projeção (com ou sem recorrências)
         const projectedBalance = totalBalance + projectedIncome - projectedExpensesForBalance;
         balanceEl.innerHTML = `${formatCurrency(projectedBalance)} <span class="text-xs text-blue-400 ml-1">📊 Projetado</span>`;
+        animateNumber(balanceEl, projectedBalance, projectedBalance >= 0);
+        // Mudar cor baseado no saldo projetado
+        if (projectedBalance < 0) {
+          balanceEl.className = 'text-3xl font-bold text-red-500';
+        } else {
+          balanceEl.className = 'text-3xl font-bold text-green-500';
+        }
       } else if (isCurrentMonth && hasProjections) {
         // Para mês atual, mostra saldo real + projeção do que falta
         const projectedBalance = totalBalance + projectedIncome - projectedExpensesForBalance;
         balanceEl.innerHTML = `${formatCurrency(totalBalance)} <span class="text-xs text-gray-500 ml-1">(${formatCurrency(projectedBalance)} projetado)</span>`;
+        animateNumber(balanceEl, totalBalance, totalBalance >= 0);
+        // Mudar cor baseado no saldo real
+        if (totalBalance < 0) {
+          balanceEl.className = 'text-3xl font-bold text-red-500';
+        } else {
+          balanceEl.className = 'text-3xl font-bold text-green-500';
+        }
       } else {
         // Para meses passados ou mês atual sem projeção, mostra apenas saldo real
         balanceEl.textContent = formatCurrency(totalBalance);
+        animateNumber(balanceEl, totalBalance, totalBalance >= 0);
+        // Mudar cor baseado no saldo real
+        if (totalBalance < 0) {
+          balanceEl.className = 'text-3xl font-bold text-red-500';
+        } else {
+          balanceEl.className = 'text-3xl font-bold text-green-500';
+        }
       }
 
       // RECEITAS E DESPESAS - mostra TODAS as despesas (incluindo crédito) no card
@@ -776,19 +860,25 @@
         } else {
           incomeEl.innerHTML = `${formatCurrency(totalIncome)} <span class="text-xs text-blue-400 ml-1">📊 Projetado</span>`;
         }
+        animateNumber(incomeEl, totalIncome, true);
         
         if (realExpensesTotal > 0) {
           expensesEl.innerHTML = `${formatCurrency(totalExpenses)} <span class="text-xs text-gray-500 ml-1">(${formatCurrency(realExpensesTotal)} real + <span class="text-blue-400">${formatCurrency(projectedExpensesTotal)} 📊</span>)</span>`;
         } else {
           expensesEl.innerHTML = `${formatCurrency(totalExpenses)} <span class="text-xs text-blue-400 ml-1">📊 Projetado</span>`;
         }
+        animateNumber(expensesEl, totalExpenses, false);
       } else if (isFutureMonth) {
         // Mês futuro sem recorrências - mostra apenas as transações reais já cadastradas
         incomeEl.innerHTML = `${formatCurrency(realIncome)} ${realIncome > 0 ? '<span class="text-xs text-blue-400 ml-1">📊 Projetado</span>' : ''}`;
+        animateNumber(incomeEl, realIncome, true);
         expensesEl.innerHTML = `${formatCurrency(realExpensesTotal)} ${realExpensesTotal > 0 ? '<span class="text-xs text-blue-400 ml-1">📊 Projetado</span>' : ''}`;
+        animateNumber(expensesEl, realExpensesTotal, false);
       } else {
         incomeEl.textContent = formatCurrency(realIncome);
+        animateNumber(incomeEl, realIncome, true);
         expensesEl.textContent = formatCurrency(realExpensesTotal);
+        animateNumber(expensesEl, realExpensesTotal, false);
       }
       
       updateMonthLabels();
@@ -1478,7 +1568,7 @@
 
       const monthTransactions = transactions.filter(t => {
         const tDate = new Date(t.date + 'T00:00:00');
-        return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
+        return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear && t.type !== 'ajuste';
       });
 
       const income = monthTransactions.filter(t => t.type === 'receita').reduce((sum, t) => sum + parseFloat(t.amount), 0);
@@ -2038,29 +2128,219 @@
       renderTransactions(filter);
     }
 
-    function openTransactionModal() {
-      if (cards.length === 0) {
-        const confirmDiv = document.createElement('div');
-        confirmDiv.className = 'modal active';
-        confirmDiv.innerHTML = `
-          <div class="modal-content max-w-md">
-            <h3 class="text-xl font-bold mb-4 text-yellow-500">⚠️ Nenhum Cartão Cadastrado</h3>
-            <p class="text-gray-400 mb-6">Você precisa cadastrar pelo menos um cartão antes de criar transações. Deseja cadastrar um cartão agora?</p>
-            <div class="flex gap-3">
-              <button class="btn-primary" onclick="this.closest('.modal').remove(); openCardModal();">
-                <svg class="inline-block mr-2" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                Cadastrar Cartão
-              </button>
-              <button class="btn-secondary" onclick="this.closest('.modal').remove()">Agora Não</button>
-            </div>
-          </div>
-        `;
-        document.body.appendChild(confirmDiv);
+    // Variáveis para autocomplete
+    let touchStartX = 0;
+    let allDescriptions = [];
+
+    // Biblioteca padrão de descrições comuns
+    const defaultDescriptions = [
+      // Receitas
+      'Salário',
+      'Freelance',
+      'Bônus',
+      'Décimo terceiro',
+      'Investimento',
+      'Resgate de investimento',
+      'Devoluções',
+      'Reembolso',
+      'Venda de item',
+      'Presente em dinheiro',
+      
+      // Despesas - Alimentação
+      'Alimentação',
+      'Almoço',
+      'Café',
+      'Supermercado',
+      'Padaria',
+      'Restaurante',
+      'Delivery',
+      'Bar',
+      'Lanche',
+      'Lanches',
+      
+      // Despesas - Transporte
+      'Transporte',
+      'Uber',
+      '99',
+      'Táxi',
+      'Combustível',
+      'Gasolina',
+      'Diesel',
+      'Manutenção do carro',
+      'Revisão do carro',
+      'Seguro do carro',
+      'Estacionamento',
+      'Passagem aérea',
+      'Passagem de ônibus',
+      'Metrô',
+      'Trem',
+      
+      // Despesas - Moradia
+      'Aluguel',
+      'Condomínio',
+      'IPTU',
+      'Luz',
+      'Água',
+      'Gás',
+      'Internet',
+      'Telefone',
+      'Reparos da casa',
+      'Móvel',
+      'Decoração',
+      
+      // Despesas - Saúde
+      'Farmácia',
+      'Remédio',
+      'Médico',
+      'Dentista',
+      'Academia',
+      'Atividade física',
+      'Seguro saúde',
+      'Consulta',
+      
+      // Despesas - Educação
+      'Educação',
+      'Curso',
+      'Livro',
+      'Material escolar',
+      'Mensalidade escolar',
+      'Faculdade',
+      'Workshop',
+      
+      // Despesas - Lazer
+      'Cinema',
+      'Teatro',
+      'Show',
+      'Passeio',
+      'Viagem',
+      'Hotel',
+      'Diversão',
+      'Jogo',
+      'Hobby',
+      
+      // Despesas - Compras
+      'Roupas',
+      'Sapatos',
+      'Bolsa',
+      'Acessórios',
+      'Eletrônico',
+      'Presente',
+      'Joias',
+      
+      // Despesas - Assinaturas
+      'Netflix',
+      'Spotify',
+      'Prime Video',
+      'Disney+',
+      'Assinatura',
+      'Streaming',
+      'Software',
+      'App',
+      
+      // Despesas - Contas e Serviços
+      'Contas',
+      'Conta de banco',
+      'Taxa bancária',
+      'Empréstimo',
+      'Financiamento',
+      'Juros',
+      'Multa',
+      
+      // Despesas - Pessoal
+      'Barbeiro',
+      'Cabeleireiro',
+      'Manicure',
+      'Pedicure',
+      'Cabelo',
+      'Higiene pessoal',
+      'Cosméticos',
+      
+      // Despesas - Outros
+      'Diversos',
+      'Ajuste',
+      'Correção',
+      'Doação',
+      'Presente para alguém',
+      'Diverso'
+    ];
+
+    function setTouchStartX(e) {
+      touchStartX = e.touches[0].clientX;
+    }
+
+    function handleDescriptionKeydown(e) {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        acceptSuggestion();
+      }
+    }
+
+    function handleDescriptionInput(e) {
+      const input = e.target;
+      const value = input.value.trim();
+      const suggestionDiv = document.getElementById('descriptionSuggestion');
+      const suggestionText = document.getElementById('suggestionText');
+
+      if (value.length === 0) {
+        suggestionDiv.classList.add('hidden');
         return;
       }
-      
+
+      // Buscar descrições (primeiro de transações anteriores, depois da biblioteca padrão)
+      const suggestion = allDescriptions.find(desc => 
+        desc.toLowerCase().startsWith(value.toLowerCase()) && desc.toLowerCase() !== value.toLowerCase()
+      );
+
+      if (suggestion) {
+        // Mostrar sugestão
+        suggestionText.textContent = suggestion;
+        suggestionDiv.classList.remove('hidden');
+
+        // Adicionar suporte a swipe à direita no mobile
+        suggestionDiv.ontouchend = (touchEvent) => {
+          const touchEndX = touchEvent.changedTouches[0].clientX;
+          const diff = touchEndX - touchStartX;
+          
+          // Se deslizou mais de 50px para a direita, aceita
+          if (diff > 50) {
+            e.preventDefault();
+            acceptSuggestion();
+          }
+        };
+      } else {
+        suggestionDiv.classList.add('hidden');
+      }
+    }
+
+    function acceptSuggestion() {
+      const input = document.getElementById('transactionDescription');
+      const suggestionDiv = document.getElementById('descriptionSuggestion');
+      const suggestionText = document.getElementById('suggestionText').textContent;
+
+      if (suggestionText) {
+        input.value = suggestionText;
+        suggestionDiv.classList.add('hidden');
+        input.focus();
+      }
+    }
+
+    function buildDescriptionSuggestions() {
+      // Coletar todas as descrições únicas de transações anteriores
+      const userDescriptions = [...new Set(
+        transactions
+          .map(t => t.description)
+          .filter(d => d && d.trim().length > 0)
+      )];
+
+      // Combinar com a biblioteca padrão (user descriptions têm prioridade)
+      allDescriptions = [
+        ...userDescriptions,
+        ...defaultDescriptions.filter(d => !userDescriptions.some(ud => ud.toLowerCase() === d.toLowerCase()))
+      ].sort();
+    }
+
+    function openTransactionModal() {
+      buildDescriptionSuggestions();
       document.getElementById('transactionModal').classList.add('active');
       selectTransactionType('receita');
     }
@@ -2557,6 +2837,10 @@
           showToast('Transação cadastrada com sucesso!', 'success');
         }
 
+        // Reabilitar botão após sucesso
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Salvar';
+        
         closeTransactionModal();
         await loadData();
         updateUI();
@@ -2565,22 +2849,66 @@
         showToast('Erro ao cadastrar transação. Tente novamente.', 'error');
         
         // Reabilitar botão em caso de erro
-        const form = document.getElementById('transactionForm');
-        const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Salvar';
-        }
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Salvar';
       }
     }
 
-    function openCardModal() {
+    function openCategoryModalFromTransaction() {
+      openedFromTransaction = true;
+      document.getElementById('transactionModal').classList.remove('active');
+      document.getElementById('categoryModal').classList.add('active');
+      
+      // Limpar o formulário de categoria
+      document.getElementById('categoryForm').reset();
+      
+      // Definir para Despesa por padrão (vindo de transação de despesa)
+      const transactionType = document.getElementById('transactionType').value;
+      if (transactionType === 'receita') {
+        document.getElementById('categoryType').value = 'receita';
+      } else {
+        document.getElementById('categoryType').value = 'despesa';
+      }
+    }
+
+    function openCardModalFromTransaction() {
+      openedFromTransaction = true;
+      document.getElementById('transactionModal').classList.remove('active');
       document.getElementById('cardModal').classList.add('active');
+      
+      // Limpar o formulário de cartão
+      document.getElementById('cardForm').reset();
+      toggleCreditCardFields();
+    }
+
+    function closeCategoryModalAndReturnToTransaction() {
+      document.getElementById('categoryModal').classList.remove('active');
+      document.getElementById('categoryForm').reset();
+      document.getElementById('transactionModal').classList.add('active');
+      updateCategoryOptions();
+    }
+
+    function closeCardModalAndReturnToTransaction() {
+      document.getElementById('cardModal').classList.remove('active');
+      document.getElementById('cardForm').reset();
+      document.getElementById('transactionModal').classList.add('active');
+      updateCardSelectionOptions();
+      updateIncomeCardOptions();
+    }
+
+    function openCategoryModal() {
+      document.getElementById('categoryModal').classList.add('active');
     }
 
     function closeCardModal() {
       document.getElementById('cardModal').classList.remove('active');
       document.getElementById('cardForm').reset();
+      
+      // Se foi aberto do modal de transação, retornar para lá
+      if (openedFromTransaction) {
+        document.getElementById('transactionModal').classList.add('active');
+        openedFromTransaction = false;
+      }
     }
 
     function toggleCreditCardFields() {
@@ -2710,20 +3038,28 @@
         if (error) throw error;
 
         showToast('Cartão cadastrado com sucesso!', 'success');
-        closeCardModal();
+        
+        // Reabilitar botão após sucesso
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Salvar';
+        
         await loadData();
         updateUI();
+        
+        // Se foi aberto do modal de transação, retornar para lá
+        if (openedFromTransaction) {
+          openedFromTransaction = false;
+          closeCardModalAndReturnToTransaction();
+        } else {
+          closeCardModal();
+        }
       } catch (error) {
         console.error('Error saving card:', error);
         showToast('Erro ao cadastrar cartão. Tente novamente.', 'error');
         
         // Reabilitar botão em caso de erro
-        const form = document.getElementById('cardForm');
-        const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
-        if (submitBtn) {
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Salvar';
-        }
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Salvar';
       }
     }
 
@@ -3021,10 +3357,72 @@
     function closeCategoryModal() {
       document.getElementById('categoryModal').classList.remove('active');
       document.getElementById('categoryForm').reset();
+      
+      // Se foi aberto do modal de transação, retornar para lá
+      if (openedFromTransaction) {
+        document.getElementById('transactionModal').classList.add('active');
+        openedFromTransaction = false;
+      }
+    }
+
+    function openAdjustBalanceModal() {
+      const balanceEl = document.getElementById('totalBalance');
+      const currentBalance = parseFloat(balanceEl.dataset.value) || 0;
+      
+      document.getElementById('currentBalanceDisplay').textContent = formatCurrency(currentBalance);
+      document.getElementById('adjustBalanceInput').value = currentBalance;
+      document.getElementById('adjustBalanceModal').classList.add('active');
+    }
+
+    function closeAdjustBalanceModal() {
+      document.getElementById('adjustBalanceModal').classList.remove('active');
+      document.getElementById('adjustBalanceForm').reset();
+    }
+
+    async function saveAdjustBalance(e) {
+      e.preventDefault();
+      
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      if (submitBtn.disabled) return;
+      
+      submitBtn.disabled = true;
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = 'Ajustando...';
+      
+      const newBalance = parseFloat(document.getElementById('adjustBalanceInput').value);
+      
+      try {
+        // Armazenar o ajuste manual no localStorage
+        const adjustments = JSON.parse(localStorage.getItem('manualBalanceAdjustments') || '{}');
+        adjustments[currentUser.id] = newBalance;
+        localStorage.setItem('manualBalanceAdjustments', JSON.stringify(adjustments));
+        
+        showToast(`Saldo ajustado para ${formatCurrency(newBalance)}`, 'success');
+        
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Confirmar';
+        
+        closeAdjustBalanceModal();
+        await loadData();
+        updateUI();
+      } catch (error) {
+        console.error('Error adjusting balance:', error);
+        showToast('Erro ao ajustar saldo. Tente novamente.', 'error');
+        
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Confirmar';
+      }
     }
 
     async function saveCategory(e) {
       e.preventDefault();
+      
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      if (submitBtn.disabled) return;
+      
+      submitBtn.disabled = true;
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = 'Salvando...';
       
       const formData = new FormData(e.target);
       const data = {
@@ -3038,12 +3436,28 @@
         if (error) throw error;
 
         showToast('Categoria cadastrada com sucesso!', 'success');
-        closeCategoryModal();
+        
+        // Reabilitar botão após sucesso
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Salvar';
+        
         await loadData();
         updateUI();
+        
+        // Se foi aberto do modal de transação, retornar para lá
+        if (openedFromTransaction) {
+          openedFromTransaction = false;
+          closeCategoryModalAndReturnToTransaction();
+        } else {
+          closeCategoryModal();
+        }
       } catch (error) {
         console.error('Error saving category:', error);
         showToast('Erro ao cadastrar categoria. Tente novamente.', 'error');
+        
+        // Reabilitar botão em caso de erro
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Salvar';
       }
     }
 
@@ -3502,6 +3916,12 @@
     }
 
     function toggleTheme() {
+      // Verificar se o usuário é admin antes de permitir mudança de tema
+      if (!isCurrentUserAdmin) {
+        showToast('Apenas administradores podem usar o Modo Turbo.', 'error');
+        return;
+      }
+      
       const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
       const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
       setTheme(newTheme);
