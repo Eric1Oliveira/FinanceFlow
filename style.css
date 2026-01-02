@@ -37,6 +37,30 @@
       box-sizing: border-box;
     }
 
+    @keyframes blob {
+      0%, 100% {
+        transform: translate(0, 0) scale(1);
+      }
+      33% {
+        transform: translate(30px, -50px) scale(1.1);
+      }
+      66% {
+        transform: translate(-20px, 20px) scale(0.9);
+      }
+    }
+
+    .animate-blob {
+      animation: blob 7s infinite;
+    }
+
+    .animation-delay-2000 {
+      animation-delay: 2s;
+    }
+
+    .animation-delay-4000 {
+      animation-delay: 4s;
+    }
+
     .sidebar {
       background: var(--bg-secondary);
       border-right: 1px solid var(--border-color);
@@ -206,6 +230,439 @@
 
     html[data-theme="light"] .transaction-item.projected:hover {
       border-color: #3b82f6;
+    }
+
+    /* Transaction Item - Estrutura otimizada */
+    .transaction-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .transaction-icon {
+      font-size: 18px;
+      font-weight: bold;
+      min-width: 24px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .transaction-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .transaction-title-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+
+    .transaction-description {
+      font-weight: 600;
+      font-size: 14px;
+      word-break: break-word;
+      color: inherit;
+    }
+
+    .badge-status {
+      font-size: 11px;
+      background: rgba(234, 179, 8, 0.2);
+      color: #fbbf24;
+      padding: 2px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .badge-projected {
+      font-size: 11px;
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+      padding: 2px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .transaction-meta {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: #888;
+    }
+
+    .meta-item {
+      word-break: break-word;
+      max-width: 100%;
+    }
+
+    .meta-separator {
+      color: #666;
+    }
+
+    .transaction-amount {
+      font-size: 16px;
+      font-weight: 700;
+      text-align: right;
+      word-break: break-word;
+    }
+
+    .transaction-actions {
+      display: flex;
+      gap: 8px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      justify-content: flex-end;
+    }
+
+    .action-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      padding: 4px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .edit-btn {
+      color: #3b82f6;
+    }
+
+    .edit-btn:hover {
+      background: rgba(59, 130, 246, 0.1);
+      border-color: #3b82f6;
+    }
+
+    .delete-btn {
+      color: #ef4444;
+    }
+
+    .delete-btn:hover {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: #ef4444;
+    }
+
+    /* ========== RECURRING ITEM STYLES ========== */
+    .recurring-item {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      transition: all 0.3s;
+      cursor: pointer;
+    }
+
+    html[data-theme="light"] .recurring-item {
+      background: #f9fbfc;
+      border-color: #d5dce0;
+      color: #2c3e50;
+    }
+
+    .recurring-item:hover {
+      border-color: #10b981;
+    }
+
+    html[data-theme="light"] .recurring-item:hover {
+      border-color: #3b82f6;
+    }
+
+    .recurring-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .recurring-icon {
+      font-size: 18px;
+      font-weight: bold;
+      min-width: 22px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .recurring-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .recurring-title {
+      font-weight: 600;
+      font-size: 14px;
+      word-break: break-word;
+      color: inherit;
+      margin-bottom: 2px;
+    }
+
+    .recurring-meta {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: #888;
+    }
+
+    .recurring-meta span {
+      display: inline;
+    }
+
+    .recurring-badge-container {
+      display: flex;
+      gap: 4px;
+    }
+
+    .recurring-badge {
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .recurring-badge.permanent {
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+    }
+
+    .recurring-badge.temporary {
+      background: rgba(251, 191, 36, 0.2);
+      color: #fbbf24;
+    }
+
+    .recurring-expires {
+      font-size: 10px;
+      background: rgba(251, 191, 36, 0.2);
+      color: #fbbf24;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+
+    .recurring-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .recurring-amount {
+      font-size: 15px;
+      font-weight: 700;
+      word-break: break-word;
+    }
+
+    .recurring-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    /* ========== GOAL ITEM STYLES ========== */
+    .goal-item {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      transition: all 0.3s;
+    }
+
+    html[data-theme="light"] .goal-item {
+      background: #f9fbfc;
+      border-color: #d5dce0;
+      color: #2c3e50;
+    }
+
+    .goal-item:hover {
+      border-color: #10b981;
+    }
+
+    html[data-theme="light"] .goal-item:hover {
+      border-color: #3b82f6;
+    }
+
+    .goal-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .goal-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .goal-title-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 3px;
+    }
+
+    .goal-title {
+      font-weight: 600;
+      font-size: 14px;
+      word-break: break-word;
+      color: inherit;
+    }
+
+    .goal-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      white-space: nowrap;
+      font-weight: 600;
+    }
+
+    .goal-badge.completed {
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+    }
+
+    .goal-badge.overdue {
+      background: rgba(239, 68, 68, 0.2);
+      color: #ef4444;
+    }
+
+    .goal-badge.deadline {
+      background: rgba(251, 191, 36, 0.2);
+      color: #fbbf24;
+    }
+
+    .goal-meta {
+      font-size: 10px;
+      color: #888;
+    }
+
+    .goal-actions {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .goal-values {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .goal-value-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 6px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+    }
+
+    html[data-theme="light"] .goal-value-item {
+      background: rgba(59, 130, 246, 0.05);
+    }
+
+    .goal-value-label {
+      font-size: 9px;
+      color: #888;
+      font-weight: 500;
+    }
+
+    .goal-value-amount {
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .goal-progress {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .goal-progress-bar-container {
+      flex: 1;
+      height: 6px;
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 3px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    html[data-theme="light"] .goal-progress-bar-container {
+      background: rgba(59, 130, 246, 0.1);
+      border-color: rgba(59, 130, 246, 0.2);
+    }
+
+    .goal-progress-bar {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s ease;
+    }
+
+    .goal-progress-text {
+      font-size: 11px;
+      font-weight: 600;
+      color: #888;
+      min-width: 30px;
+      text-align: right;
+    }
+
+    .goal-footer {
+      display: flex;
+      gap: 6px;
+    }
+
+    .goal-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #ffffff;
+    }
+
+    .add-btn {
+      background: linear-gradient(135deg, #10b981, #059669);
+    }
+
+    .add-btn:hover {
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .withdraw-btn {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+    }
+
+    .withdraw-btn:hover {
+      box-shadow: 0 0 8px rgba(59, 130, 246, 0.4);
+      transform: translateY(-1px);
+    }
+
+    html[data-theme="light"] .add-btn {
+      background: linear-gradient(135deg, #10b981, #059669);
+    }
+
+    html[data-theme="light"] .withdraw-btn {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
     }
 
     .credit-card-visual {
@@ -995,6 +1452,47 @@
         padding: 80px 16px 24px !important;
       }
 
+      /* Dashboard mobile: month-selector ao lado do menu */
+      #dashboardPage {
+        --mobileMenuWidth: 60px;
+      }
+
+      #dashboardPage .month-selector {
+        position: fixed !important;
+        top: 16px !important;
+        left: 80px !important;
+        right: 16px !important;
+        z-index: 50;
+        padding: 4px 6px !important;
+        font-size: 11px !important;
+        width: auto !important;
+      }
+
+      #dashboardPage .month-selector button {
+        padding: 4px !important;
+        flex-shrink: 0;
+      }
+
+      #dashboardPage .month-selector svg {
+        width: 14px !important;
+        height: 14px !important;
+      }
+
+      #dashboardPage .month-label {
+        font-size: 11px !important;
+        padding: 0 !important;
+        white-space: nowrap;
+      }
+
+      #dashboardPage #backToCurrentBtn {
+        left: 59% !important;
+        z-index: 50 !important;
+        transform: translateX(-50%) !important;
+        bottom: auto !important;
+        top: 50px !important;
+        position: fixed !important;
+      }
+
       .stat-card {
         padding: 16px;
       }
@@ -1032,6 +1530,15 @@
 
       input, select, textarea {
         font-size: 16px !important;
+      }
+    }
+
+    /* Reset do month-selector no desktop */
+    @media (min-width: 768px) {
+      #dashboardPage .month-selector {
+        position: relative !important;
+        top: auto !important;
+        right: auto !important;
       }
     }
 
@@ -1092,4 +1599,788 @@
     html[data-theme="light"] button[onclick*="openCategoryModalFromRecurring"]:hover,
     html[data-theme="light"] button[onclick*="openCardModalFromRecurring"]:hover {
       background: #059669 !important;
+    }
+
+    /* Filtro de gráfico */
+    .active-filter {
+      background: #10b981 !important;
+      color: white !important;
+      border-color: #059669 !important;
+    }
+
+    html[data-theme="light"] .active-filter {
+      background: #3b82f6 !important;
+      color: white !important;
+      border-color: #2563eb !important;
+    }
+
+    /* Ajuste de badges em tema light com fundo verde */
+    html[data-theme="light"] span[class*="bg-green-900"],
+    html[data-theme="light"] span[class*="bg-yellow-900"],
+    html[data-theme="light"] span[class*="text-green-300"],
+    html[data-theme="light"] span[class*="text-yellow-300"] {
+      color: #ffffff !important;
+    }
+
+    html[data-theme="light"] span.bg-green-900,
+    html[data-theme="light"] span.text-green-300 {
+      background: #10b981 !important;
+      color: #ffffff !important;
+    }
+
+    html[data-theme="light"] span.bg-yellow-900,
+    html[data-theme="light"] span.text-yellow-300 {
+      background: #f59e0b !important;
+      color: #ffffff !important;
+    }
+
+    /* Divs com fundo verde transparente em tema light - ajustar para verde mais escuro */
+    html[data-theme="light"] div[class*="bg-green-900"] {
+      background: rgba(16, 185, 129, 0.1) !important;
+    }
+
+    html[data-theme="light"] .text-green-400,
+    html[data-theme="light"] .text-green-500 {
+      color: #059669 !important;
+    }
+
+    html[data-theme="light"] .text-yellow-400 {
+      color: #d97706 !important;
+    }
+
+    html[data-theme="light"] .text-purple-400 {
+      color: #9333ea !important;
+    }
+
+    /* Income and Expenses Colors - Always show correct colors */
+    #monthIncome {
+      color: #10b981 !important;
+    }
+
+    #monthExpenses {
+      color: #ef4444 !important;
+    }
+
+    html[data-theme="light"] #monthIncome {
+      color: #10b981 !important;
+    }
+
+    html[data-theme="light"] #monthExpenses {
+      color: #ef4444 !important;
+    }
+
+    /* Total Balance - Dynamic, but ensure correct colors when set */
+    #totalBalance.text-green-500 {
+      color: #10b981 !important;
+    }
+
+    #totalBalance.text-red-500 {
+      color: #ef4444 !important;
+    }
+
+    html[data-theme="light"] #totalBalance.text-green-500 {
+      color: #10b981 !important;
+    }
+
+    html[data-theme="light"] #totalBalance.text-red-500 {
+      color: #ef4444 !important;
+    }
+
+    /* ========== MOBILE OPTIMIZATION (Telas Pequenas) ========== */
+    @media (max-width: 480px) {
+      /* Desabilitar zoom e pan no mobile */
+      html, body {
+        touch-action: pan-y;
+        overflow-x: hidden;
+      }
+
+      /* ===== TRANSAÇÕES MOBILE ===== */
+      .transaction-item {
+        padding: 10px !important;
+        margin-bottom: 6px !important;
+        border-radius: 6px;
+      }
+
+      .transaction-header {
+        gap: 8px;
+      }
+
+      .transaction-icon {
+        font-size: 16px;
+        min-width: 20px;
+      }
+
+      .transaction-description {
+        font-size: 13px;
+        max-width: 150px;
+      }
+
+      .transaction-meta {
+        font-size: 11px;
+        gap: 3px;
+      }
+
+      .meta-separator {
+        display: none;
+      }
+
+      .meta-item {
+        display: inline;
+      }
+
+      .meta-item:not(:first-child)::before {
+        content: " • ";
+        color: #666;
+      }
+
+      .transaction-amount {
+        font-size: 13px;
+      }
+
+      .transaction-actions {
+        gap: 4px;
+        padding-top: 6px;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+      }
+
+      .action-btn {
+        padding: 4px 6px;
+        width: 28px;
+        height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .action-btn svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      .badge-status,
+      .badge-projected {
+        font-size: 10px;
+        padding: 2px 6px;
+      }
+
+      /* ===== TRANSAÇÕES RECORRENTES MOBILE ===== */
+      .recurring-item {
+        padding: 10px !important;
+        margin-bottom: 6px !important;
+        border-radius: 6px;
+      }
+
+      .recurring-header {
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+
+      .recurring-icon {
+        font-size: 16px;
+        min-width: 20px;
+      }
+
+      .recurring-title {
+        font-size: 13px;
+        max-width: 140px;
+      }
+
+      .recurring-meta {
+        font-size: 10px;
+        gap: 2px;
+      }
+
+      .recurring-badge {
+        font-size: 11px;
+        padding: 2px 6px;
+      }
+
+      .recurring-expires {
+        font-size: 9px;
+        padding: 2px 5px;
+      }
+
+      .recurring-footer {
+        padding-top: 6px;
+        gap: 8px;
+      }
+
+      .recurring-amount {
+        font-size: 13px;
+        min-width: fit-content;
+      }
+
+      .recurring-actions {
+        gap: 4px;
+      }
+
+      .recurring-actions .action-btn {
+        padding: 4px 6px;
+        width: 28px;
+        height: 28px;
+      }
+
+      .recurring-actions .action-btn svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      /* ===== METAS MOBILE ===== */
+      .goal-item {
+        padding: 10px !important;
+        margin-bottom: 6px !important;
+      }
+
+      .goal-title {
+        font-size: 13px;
+        max-width: 140px;
+      }
+
+      .goal-meta {
+        font-size: 9px;
+      }
+
+      .goal-badge {
+        font-size: 9px;
+        padding: 1px 4px;
+      }
+
+      .goal-values {
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+
+      .goal-value-item {
+        padding: 4px;
+        gap: 1px;
+      }
+
+      .goal-value-label {
+        font-size: 8px;
+      }
+
+      .goal-value-amount {
+        font-size: 11px;
+      }
+
+      .goal-progress {
+        gap: 6px;
+        margin-bottom: 8px;
+      }
+
+      .goal-progress-bar-container {
+        height: 4px;
+      }
+
+      .goal-progress-text {
+        font-size: 10px;
+        min-width: 28px;
+      }
+
+      .goal-footer {
+        gap: 4px;
+      }
+
+      .goal-btn {
+        padding: 6px 8px;
+        font-size: 10px;
+      }
+
+      .goal-btn svg {
+        width: 12px;
+        height: 12px;
+      }
+
+      .goal-actions .action-btn {
+        padding: 4px 6px;
+        width: 28px;
+        height: 28px;
+      }
+
+      .goal-actions .action-btn svg {
+        width: 14px;
+        height: 14px;
+      }
+
+      /* ===== GERAL MOBILE ===== */
+      .stat-card {
+        padding: 10px !important;
+        margin-bottom: 6px !important;
+        border-radius: 6px;
+      }
+
+      /* Grid de 3 colunas em meta - converter para 2 cols ou stack */
+      .stat-card .grid.grid-cols-3 {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 6px !important;
+      }
+
+      .stat-card .grid.grid-cols-3 > div:nth-child(3) {
+        grid-column: 1 / -1;
+      }
+
+      .stat-card .grid.grid-cols-3 > div {
+        width: 100%;
+        padding: 8px !important;
+        font-size: 12px;
+      }
+
+      .stat-card .grid.grid-cols-3 > div p {
+        font-size: 12px !important;
+      }
+
+      /* Header de meta em mobile */
+      .stat-card .flex.items-start.justify-between {
+        flex-direction: column !important;
+        gap: 6px;
+        align-items: flex-start !important;
+      }
+
+      .stat-card .flex.gap-2 {
+        width: 100%;
+        justify-content: flex-end;
+        margin-top: 4px;
+      }
+
+      .stat-card .flex.gap-2 button {
+        padding: 4px !important;
+        width: 26px;
+        height: 26px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .stat-card .flex.gap-2 svg {
+        width: 14px !important;
+        height: 14px !important;
+      }
+
+      /* Barra de progresso em mobile */
+      .stat-card .w-full.rounded-full.h-3 {
+        height: 5px !important;
+      }
+
+      /* Texto em meta */
+      .stat-card .text-xl.font-bold {
+        font-size: 13px !important;
+      }
+
+      .stat-card .text-lg.font-bold {
+        font-size: 12px !important;
+      }
+
+      .stat-card .text-xs {
+        font-size: 9px !important;
+      }
+
+      .stat-card h3.text-xl.font-bold {
+        font-size: 13px !important;
+        word-break: break-word;
+      }
+
+      .stat-card .space-y-4 {
+        gap: 6px !important;
+      }
+
+      .stat-card .space-y-4 > div {
+        padding: 6px !important;
+      }
+
+      /* ===== TRANSAÇÕES RECORRENTES MOBILE ===== */
+      .stat-card .flex.items-center.gap-3.mb-2 {
+        width: 100%;
+        gap: 6px !important;
+      }
+
+      .stat-card .flex.items-center.gap-3.mb-2 span {
+        font-size: 12px !important;
+      }
+
+      .stat-card h4.font-bold.text-lg {
+        font-size: 13px !important;
+        word-break: break-word;
+      }
+
+      .stat-card .flex.items-center.gap-2.mt-1 {
+        flex-wrap: wrap;
+        gap: 3px !important;
+        width: 100%;
+        font-size: 10px;
+      }
+
+      .stat-card .flex.items-center.gap-2.mt-1 span {
+        font-size: 10px !important;
+      }
+
+      /* Valor em mobile */
+      .stat-card .text-right.flex.items-center.gap-3 {
+        width: 100%;
+        justify-content: space-between;
+        padding-top: 6px;
+        border-top: 1px solid rgba(255, 255, 255, 0.1);
+        align-items: center;
+      }
+
+      .stat-card .text-right.flex.items-center.gap-3 button {
+        padding: 4px !important;
+        width: 26px;
+        height: 26px;
+      }
+
+      .stat-card .text-right.flex.items-center.gap-3 p {
+        font-size: 13px !important;
+        margin: 0;
+      }
+
+      .stat-card .text-2xl.font-bold {
+        font-size: 13px !important;
+      }
+
+      /* ===== GERAL MOBILE ===== */
+      /* Garantir que não haja overflow horizontal */
+      .transaction-item,
+      .stat-card {
+        max-width: 100% !important;
+        box-sizing: border-box;
+        overflow: hidden;
+      }
+
+      /* Badges pequenos em mobile */
+      .stat-card span.text-xs {
+        font-size: 9px !important;
+        padding: 2px 6px !important;
+      }
+
+      /* Padding reduzido em páginas mobile */
+      #transactionsPage .p-6,
+      #recurringPage .p-6,
+      #goalsPage .p-6 {
+        padding: 8px !important;
+        padding-top: 60px !important;
+      }
+
+      /* Transações mobile: month-selector ao lado do menu (igual Dashboard) */
+      #transactionsPage .month-selector {
+        position: fixed !important;
+        top: 16px !important;
+        left: 80px !important;
+        right: 16px !important;
+        z-index: 50;
+        padding: 4px 6px !important;
+        font-size: 11px !important;
+        width: auto !important;
+      }
+
+      #transactionsPage .month-selector button {
+        padding: 4px !important;
+        flex-shrink: 0;
+      }
+
+      #transactionsPage .month-selector svg {
+        width: 14px !important;
+        height: 14px !important;
+      }
+
+      #transactionsPage #backToCurrentBtn2 {
+        left: 59% !important;
+        z-index: 50 !important;
+        transform: translateX(-50%) !important;
+        bottom: auto !important;
+        top: 40px !important;
+        position: fixed !important;
+      }
+
+      /* Gap reduzido em filtros */
+      .mb-4.flex.gap-2 {
+        gap: 4px !important;
+        flex-wrap: wrap;
+        margin-bottom: 8px !important;
+      }
+
+      .mb-4.flex.gap-2 .btn-secondary {
+        font-size: 12px !important;
+        padding: 6px 10px !important;
+        flex: 1;
+        min-width: 60px;
+      }
+
+      /* Heading em seções */
+      .flex.flex-col.md\\:flex-row.items-center.justify-center.md\\:justify-between.mb-6.gap-4 {
+        flex-direction: column !important;
+        gap: 12px !important;
+      }
+
+      .flex.flex-col.md\\:flex-row.items-center.justify-center.md\\:justify-between.mb-6.gap-4 > * {
+        width: 100%;
+      }
+
+      /* Garantir que input não zooma */
+      input, select, textarea {
+        font-size: 16px !important;
+      }
+
+      /* Flex items stack em mobile */
+      .transaction-item .flex.items-center {
+        flex-direction: column;
+        align-items: flex-start;
+        width: 100%;
+      }
+
+      /* Info box em meta - mobile */
+      .stat-card .flex.items-center.gap-2.rounded-lg.p-3 {
+        width: 100%;
+        gap: 6px !important;
+        padding: 8px !important;
+      }
+
+      .stat-card .flex.items-center.gap-2.rounded-lg.p-3 svg {
+        min-width: 12px;
+        width: 12px;
+        height: 12px;
+      }
+    }
+
+    /* Extra small devices (< 360px) */
+    @media (max-width: 360px) {
+      .transaction-item {
+        padding: 8px !important;
+        margin-bottom: 4px !important;
+      }
+
+      .transaction-icon {
+        font-size: 14px;
+        min-width: 18px;
+      }
+
+      .transaction-description {
+        font-size: 12px !important;
+        max-width: 120px;
+      }
+
+      .transaction-meta {
+        font-size: 10px;
+        gap: 2px;
+      }
+
+      .transaction-amount {
+        font-size: 12px;
+      }
+
+      .action-btn {
+        padding: 3px 5px;
+        width: 24px;
+        height: 24px;
+      }
+
+      .action-btn svg {
+        width: 12px;
+        height: 12px;
+      }
+
+      .badge-status,
+      .badge-projected {
+        font-size: 9px;
+        padding: 1px 4px;
+      }
+
+      /* ===== TRANSAÇÕES RECORRENTES EXTRA SMALL ===== */
+      .recurring-item {
+        padding: 8px !important;
+        margin-bottom: 4px !important;
+      }
+
+      .recurring-icon {
+        font-size: 14px;
+        min-width: 18px;
+      }
+
+      .recurring-title {
+        font-size: 12px;
+        max-width: 120px;
+      }
+
+      .recurring-meta {
+        font-size: 9px;
+        gap: 1px;
+      }
+
+      .recurring-badge {
+        font-size: 10px;
+        padding: 1px 4px;
+      }
+
+      .recurring-expires {
+        font-size: 8px;
+        padding: 1px 3px;
+      }
+
+      .recurring-amount {
+        font-size: 12px;
+      }
+
+      .recurring-actions .action-btn {
+        padding: 3px 5px;
+        width: 22px;
+        height: 22px;
+      }
+
+      .recurring-actions .action-btn svg {
+        width: 12px;
+        height: 12px;
+      }
+
+      /* ===== METAS EXTRA SMALL ===== */
+      .goal-item {
+        padding: 8px !important;
+        margin-bottom: 4px !important;
+      }
+
+      .goal-title {
+        font-size: 12px;
+        max-width: 120px;
+      }
+
+      .goal-meta {
+        font-size: 8px;
+      }
+
+      .goal-badge {
+        font-size: 8px;
+        padding: 1px 3px;
+      }
+
+      .goal-values {
+        gap: 4px;
+        margin-bottom: 6px;
+      }
+
+      .goal-value-item {
+        padding: 3px;
+        gap: 1px;
+      }
+
+      .goal-value-label {
+        font-size: 7px;
+      }
+
+      .goal-value-amount {
+        font-size: 10px;
+      }
+
+      .goal-progress {
+        gap: 4px;
+        margin-bottom: 6px;
+      }
+
+      .goal-progress-bar-container {
+        height: 3px;
+      }
+
+      .goal-progress-text {
+        font-size: 9px;
+        min-width: 24px;
+      }
+
+      .goal-footer {
+        gap: 3px;
+      }
+
+      .goal-btn {
+        padding: 5px 6px;
+        font-size: 9px;
+      }
+
+      .goal-btn svg {
+        width: 11px;
+        height: 11px;
+      }
+
+      .goal-actions .action-btn {
+        padding: 3px 5px;
+        width: 22px;
+        height: 22px;
+      }
+
+      .goal-actions .action-btn svg {
+        width: 12px;
+        height: 12px;
+      }
+
+      .stat-card {
+        padding: 8px !important;
+        margin-bottom: 4px !important;
+      }
+
+      .stat-card h3.text-xl.font-bold {
+        font-size: 12px !important;
+      }
+
+      .stat-card .text-lg.font-bold {
+        font-size: 11px !important;
+      }
+
+      .stat-card .text-xl.font-bold {
+        font-size: 11px !important;
+      }
+
+      .stat-card .text-2xl.font-bold {
+        font-size: 12px !important;
+      }
+
+      .stat-card .grid.grid-cols-3 > div {
+        padding: 6px !important;
+        font-size: 10px;
+      }
+
+      .stat-card .grid.grid-cols-3 > div p {
+        font-size: 10px !important;
+      }
+
+      .stat-card .text-xs {
+        font-size: 8px !important;
+      }
+
+      .stat-card .flex.gap-2 button {
+        width: 22px;
+        height: 22px;
+      }
+
+      .stat-card .flex.gap-2 svg {
+        width: 12px !important;
+        height: 12px !important;
+      }
+
+      .stat-card .w-full.rounded-full.h-3 {
+        height: 4px !important;
+      }
+
+      .stat-card .space-y-4 {
+        gap: 4px !important;
+      }
+
+      .stat-card .space-y-4 > div {
+        padding: 4px !important;
+      }
+
+      .stat-card h4.font-bold.text-lg {
+        font-size: 12px !important;
+      }
+
+      .stat-card .flex.items-center.gap-2.mt-1 {
+        font-size: 9px;
+      }
+
+      #transactionsPage .p-6,
+      #recurringPage .p-6,
+      #goalsPage .p-6 {
+        padding: 4px !important;
+        padding-top: 60px !important;
+      }
+
+      .mb-4.flex.gap-2 .btn-secondary {
+        font-size: 11px !important;
+        padding: 4px 8px !important;
+      }
     }

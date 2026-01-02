@@ -27,6 +27,11 @@
     let recurringTransactions = [];
     let currentViewDate = new Date();
     let currentPage = 'dashboard'; // Rastreia a página atual
+    let achievementsPage = 0; // Página atual de conquistas
+    let banks = []; // Instituições financeiras
+    let cdiRate = 0; // Taxa CDI anual
+    let chartGranularity = 'month'; // Granularidade do gráfico: 'day', 'month', 'year'
+    let lastSimulationParams = {}; // Armazenar últimos parâmetros da simulação
     let categories = [
       { id: 1, name: 'Salário', type: 'receita' },
       { id: 2, name: 'Freelance', type: 'receita' },
@@ -62,8 +67,17 @@
       document.getElementById('app').classList.remove('hidden');
       
       await createTablesIfNotExist();
+      console.log('Iniciando loadData...');
       await loadData();
+      console.log('loadData concluído. Banks:', banks);
       await checkAdminStatus();
+      
+      // Carregue a UI do simulador
+      console.log('Chamando loadSimulatorUI...');
+      loadSimulatorUI();
+      
+      // Inicializar FAB draggable
+      initializeFABDraggable();
       
       // Inicializa a página com o Dashboard ativo
       navigateTo('dashboard');
@@ -134,9 +148,14 @@
       loginBtn.textContent = 'Entrando...';
       
       // Timeout de segurança (15 segundos)
-      const timeoutId = setTimeout(() => {
+      let timeoutId = null;
+      const resetButton = () => {
         loginBtn.disabled = false;
         loginBtn.textContent = 'Entrar';
+      };
+      
+      timeoutId = setTimeout(() => {
+        resetButton();
         showToast('Login demorou muito. Tente novamente.', 'error');
       }, 15000);
       
@@ -173,9 +192,8 @@
         clearTimeout(timeoutId);
         console.error('Erro ao fazer login:', error);
         showToast(error.message || 'Erro ao fazer login. Verifique suas credenciais.', 'error');
-        
-        loginBtn.disabled = false;
-        loginBtn.textContent = 'Entrar';
+      } finally {
+        resetButton();
       }
     }
 
@@ -198,9 +216,14 @@
       signupBtn.textContent = 'Criando conta...';
       
       // Timeout de segurança (20 segundos)
-      const timeoutId = setTimeout(() => {
+      let timeoutId = null;
+      const resetButton = () => {
         signupBtn.disabled = false;
         signupBtn.textContent = 'Criar Conta';
+      };
+      
+      timeoutId = setTimeout(() => {
+        resetButton();
         showToast('Cadastro demorou muito. Tente novamente.', 'error');
       }, 20000);
       
@@ -242,16 +265,17 @@
         clearTimeout(timeoutId);
         console.error('Erro ao criar conta:', error);
         showToast(error.message || 'Erro ao criar conta. Tente novamente.', 'error');
-        
-        signupBtn.disabled = false;
-        signupBtn.textContent = 'Criar Conta';
+      } finally {
+        resetButton();
       }
     }
 
     // Atualizar nome do usuário na sidebar
     function updateUserProfileName() {
       if (currentUser) {
-        const fullName = currentUser.user_metadata?.full_name || currentUser.email || 'Usuário';
+        // Tentar usar nome salvo nas configurações, senão usar email ou padrão
+        const savedName = localStorage.getItem(`userName_${currentUser.id}`);
+        const fullName = savedName || currentUser.user_metadata?.full_name || currentUser.email?.split('@')[0] || 'Usuário';
         const userNameElement = document.getElementById('userProfileName');
         if (userNameElement) {
           userNameElement.textContent = fullName;
@@ -405,6 +429,37 @@
           recurringTransactions = recurringResult.data;
         }
 
+        // Carregar bancos e CDI para o simulador
+        const banksResult = await supabaseClient
+          .from('banks')
+          .select('*')
+          .order('name', { ascending: true });
+        
+        if (banksResult.error) {
+          console.warn('Erro ao carregar bancos:', banksResult.error);
+        } else if (banksResult.data) {
+          banks = banksResult.data;
+          console.log('Bancos carregados:', banks.length, banks);
+          // Atualizar o select de bancos
+          const bankSelect = document.getElementById('simulatorBank');
+          if (bankSelect && banks.length > 0) {
+            bankSelect.innerHTML = '<option value="">-- Personalizado --</option>' + 
+              banks.map(b => `<option value="${b.id}">${b.name} (${b.cdi_percentage}% do CDI)</option>`).join('');
+          }
+        }
+
+        const cdiResult = await supabaseClient
+          .from('cdi_rates')
+          .select('*')
+          .order('year', { ascending: false })
+          .limit(1);
+        
+        if (cdiResult.error) {
+          console.warn('Erro ao carregar CDI:', cdiResult.error);
+        } else if (cdiResult.data && cdiResult.data.length > 0) {
+          cdiRate = cdiResult.data[0].annual_rate;
+        }
+
         await processRecurringTransactions();
         calculateUserStats();
       } catch (error) {
@@ -510,6 +565,9 @@
         const startDate = new Date(recurring.start_date + 'T00:00:00');
         startDate.setHours(0, 0, 0, 0);
         
+        const startMonth = startDate.getMonth();
+        const startYear = startDate.getFullYear();
+        
         // Verifica se a recorrente já deve ter iniciado
         if (targetMonthStart < new Date(startDate.getFullYear(), startDate.getMonth(), 1)) {
           continue;
@@ -528,51 +586,190 @@
         const transactionDate = new Date(year, month, recurring.day_of_month);
         const dateString = transactionDate.toISOString().split('T')[0];
 
-        // Verifica se já existe uma transação real com os mesmos dados
-        const existingTransaction = transactions.find(t => 
-          t.description === recurring.description &&
-          t.date === dateString &&
-          t.amount === parseFloat(recurring.amount)
-        );
-
-        if (!existingTransaction) {
-          let paymentMethod = null;
-          let cardId = null;
-          
-          // Buscar card_id do localStorage
-          if (cardMappings[recurring.id]) {
-            cardId = cardMappings[recurring.id];
-            const card = cards.find(c => c.id === cardId);
-            if (card) {
-              paymentMethod = card.type;
-            }
-          }
-          
-          // REGRA: Se o dia da recorrência já passou no mês visualizado, NÃO é projeção
-          const isFutureProjection = transactionDate > today;
-          
-          projectedTransactions.push({
-            id: `recurring_${recurring.id}_${month}_${year}`,
-            type: recurring.type,
-            description: recurring.description,
-            amount: parseFloat(recurring.amount),
-            category: recurring.category,
-            date: dateString,
-            payment_method: paymentMethod,
-            card_id: cardId,
-            installments: 1,
-            current_installment: 1,
-            is_projected: isFutureProjection
-          });
+        // NÃO mostrar como projeção se for o mês de início da recorrente
+        // porque já foi criada uma transação real quando a recorrente foi cadastrada
+        const isStartMonth = month === startMonth && year === startYear;
+        
+        if (isStartMonth) {
+          // Pular a projeção no mês de início - a transação real já foi criada
+          continue;
         }
+
+        // Apenas mostrar como projeção se a data for FUTURA (não foi criada ainda)
+        // Transações já criadas aparecem normalmente na lista de transações
+        if (transactionDate <= today) {
+          continue;
+        }
+
+        let paymentMethod = null;
+        let cardId = null;
+        
+        // Buscar card_id do localStorage
+        if (cardMappings[recurring.id]) {
+          cardId = cardMappings[recurring.id];
+          const card = cards.find(c => c.id === cardId);
+          if (card) {
+            paymentMethod = card.type;
+          }
+        }
+        
+        projectedTransactions.push({
+          id: `recurring_${recurring.id}_${month}_${year}`,
+          type: recurring.type,
+          description: recurring.description,
+          amount: parseFloat(recurring.amount),
+          category: recurring.category,
+          date: dateString,
+          payment_method: paymentMethod,
+          card_id: cardId,
+          installments: 1,
+          current_installment: 1,
+          is_projected: true
+        });
       }
 
       return projectedTransactions;
     }
 
+    function initializeFABDraggable() {
+      const fab = document.getElementById('fabButton');
+      if (!fab) return;
+
+      let isDragging = false;
+      let currentX;
+      let currentY;
+      let initialX;
+      let initialY;
+
+      // Restaurar posição salva
+      const savedPosition = localStorage.getItem('fabPosition');
+      if (savedPosition) {
+        const { bottom, right } = JSON.parse(savedPosition);
+        fab.style.bottom = bottom + 'px';
+        fab.style.right = right + 'px';
+      }
+
+      fab.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        initialX = e.clientX - fab.offsetLeft;
+        initialY = e.clientY - fab.offsetTop;
+        fab.style.cursor = 'grabbing';
+        fab.style.transition = 'none';
+      });
+
+      fab.addEventListener('touchstart', (e) => {
+        isDragging = true;
+        initialX = e.touches[0].clientX - fab.offsetLeft;
+        initialY = e.touches[0].clientY - fab.offsetTop;
+        fab.style.cursor = 'grabbing';
+        fab.style.transition = 'none';
+      });
+
+      document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        
+        currentX = e.clientX - initialX;
+        currentY = e.clientY - initialY;
+
+        // Limitar ao viewport
+        const maxX = window.innerWidth - fab.offsetWidth;
+        const maxY = window.innerHeight - fab.offsetHeight;
+
+        currentX = Math.max(0, Math.min(currentX, maxX));
+        currentY = Math.max(0, Math.min(currentY, maxY));
+
+        fab.style.left = currentX + 'px';
+        fab.style.top = currentY + 'px';
+        fab.style.right = 'auto';
+        fab.style.bottom = 'auto';
+      });
+
+      document.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        
+        currentX = e.touches[0].clientX - initialX;
+        currentY = e.touches[0].clientY - initialY;
+
+        // Limitar ao viewport
+        const maxX = window.innerWidth - fab.offsetWidth;
+        const maxY = window.innerHeight - fab.offsetHeight;
+
+        currentX = Math.max(0, Math.min(currentX, maxX));
+        currentY = Math.max(0, Math.min(currentY, maxY));
+
+        fab.style.left = currentX + 'px';
+        fab.style.top = currentY + 'px';
+        fab.style.right = 'auto';
+        fab.style.bottom = 'auto';
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        fab.style.cursor = 'grab';
+        snapFABToEdge(fab);
+      });
+
+      document.addEventListener('touchend', () => {
+        if (!isDragging) return;
+        isDragging = false;
+        fab.style.cursor = 'grab';
+        snapFABToEdge(fab);
+      });
+
+      fab.style.cursor = 'grab';
+    }
+
+    function snapFABToEdge(fab) {
+      const rect = fab.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      const distLeft = centerX;
+      const distRight = window.innerWidth - centerX;
+      const distTop = centerY;
+      const distBottom = window.innerHeight - centerY;
+
+      const minDist = Math.min(distLeft, distRight, distTop, distBottom);
+      const padding = 20;
+
+      fab.style.transition = 'all 0.3s ease';
+
+      if (minDist === distLeft) {
+        // Snap para esquerda
+        fab.style.left = padding + 'px';
+        fab.style.top = 'auto';
+        fab.style.right = 'auto';
+        fab.style.bottom = (window.innerHeight - rect.bottom + window.scrollY) + 'px';
+        localStorage.setItem('fabPosition', JSON.stringify({ bottom: padding, right: padding }));
+      } else if (minDist === distRight) {
+        // Snap para direita
+        fab.style.right = padding + 'px';
+        fab.style.left = 'auto';
+        fab.style.top = 'auto';
+        fab.style.bottom = (window.innerHeight - rect.bottom + window.scrollY) + 'px';
+        localStorage.setItem('fabPosition', JSON.stringify({ bottom: padding, right: padding }));
+      } else if (minDist === distTop) {
+        // Snap para cima
+        fab.style.top = padding + 'px';
+        fab.style.bottom = 'auto';
+        fab.style.right = padding + 'px';
+        fab.style.left = 'auto';
+        localStorage.setItem('fabPosition', JSON.stringify({ bottom: 'auto', right: padding }));
+      } else {
+        // Snap para baixo (padrão)
+        fab.style.bottom = padding + 'px';
+        fab.style.right = padding + 'px';
+        fab.style.top = 'auto';
+        fab.style.left = 'auto';
+        localStorage.setItem('fabPosition', JSON.stringify({ bottom: padding, right: padding }));
+      }
+    }
+
     function navigateTo(page) {
       const pages = document.querySelectorAll('.page');
       const sidebarItems = document.querySelectorAll('.sidebar-item');
+      const fabButton = document.getElementById('fabButton');
 
       // Remove active class de todas as páginas
       pages.forEach(p => p.classList.remove('active'));
@@ -586,17 +783,29 @@
         pageElement.classList.add('active');
       }
 
+      // Mostrar/esconder FAB (esconder apenas em Configurações)
+      if (fabButton) {
+        fabButton.style.display = page === 'settings' ? 'none' : 'flex';
+      }
+
       // Salva a página atual
       currentPage = page;
+
+      // Se foi para configurações, atualizar dados
+      if (page === 'settings') {
+        updateSettingsPage();
+      }
 
       updateUI();
     }
 
     function calculateSimulation() {
       const initialValue = parseFloat(document.getElementById('simulatorInitialValue').value);
-      const interestRate = parseFloat(document.getElementById('simulatorInterestRate').value);
-      const startMonth = document.getElementById('simulatorStartMonth').value;
-      const endMonth = document.getElementById('simulatorEndMonth').value;
+      const startDate = new Date(document.getElementById('simulatorStartMonth').value + '-01');
+      const endDate = new Date(document.getElementById('simulatorEndMonth').value + '-01');
+      const rateType = document.getElementById('simulatorRateType')?.value || 'FIXED';
+      const bankId = document.getElementById('simulatorBank')?.value;
+      let rateValue = parseFloat(document.getElementById('simulatorInterestRate').value) || 0;
 
       // Validação
       if (!initialValue || isNaN(initialValue) || initialValue <= 0) {
@@ -604,120 +813,504 @@
         return;
       }
 
-      if (!interestRate || isNaN(interestRate) || interestRate < 0) {
-        showToast('Digite uma taxa de juros válida.', 'error');
-        return;
-      }
-
-      if (!startMonth || !endMonth) {
+      if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
         showToast('Selecione o período (data inicial e final).', 'error');
         return;
       }
 
-      // Calcular número de meses
-      const start = new Date(startMonth);
-      const end = new Date(endMonth);
-      const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
-
-      if (monthsDiff < 0) {
+      if (startDate >= endDate) {
         showToast('A data final deve ser posterior à data inicial.', 'error');
         return;
       }
 
-      // Calcular juros compostos: VF = VI * (1 + i)^n
-      const rate = interestRate / 100;
-      const finalValue = initialValue * Math.pow(1 + rate, monthsDiff);
-      const interestGained = finalValue - initialValue;
+      // Se for CDI, obter percentual do banco selecionado
+      if (rateType === 'CDI' && bankId) {
+        const selectedBank = banks.find(b => b.id === bankId);
+        if (selectedBank) {
+          rateValue = selectedBank.cdi_percentage;
+        }
+      }
+
+      if (rateValue === 0 || isNaN(rateValue)) {
+        showToast('Digite uma taxa válida ou selecione um banco.', 'error');
+        return;
+      }
+
+      // Calcular resultado baseado no tipo
+      let finalValue, interestGained, daysDiff;
+
+      if (rateType === 'CDI') {
+        // Cálculo por CDI (252 dias úteis por ano)
+        daysDiff = calculateBusinessDays(startDate, endDate);
+        
+        // CDI diário: (1 + CDI_ANUAL)^(1/252) - 1
+        const cdiDaily = Math.pow(1 + (cdiRate / 100), 1 / 252) - 1;
+        
+        // Rendimento diário com percentual do banco: CDI_DIÁRIO × (percentual / 100)
+        const dailyReturn = cdiDaily * (rateValue / 100);
+        
+        // Montante final: valor_inicial × (1 + rendimento_diário)^dias
+        finalValue = initialValue * Math.pow(1 + dailyReturn, daysDiff);
+        interestGained = finalValue - initialValue;
+      } else {
+        // Cálculo por taxa fixa mensal (compatível com anterior)
+        const monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+                          (endDate.getMonth() - startDate.getMonth());
+        daysDiff = monthsDiff;
+        const rate = rateValue / 100;
+        finalValue = initialValue * Math.pow(1 + rate, monthsDiff);
+        interestGained = finalValue - initialValue;
+      }
 
       // Atualizar resultados
       document.getElementById('resultInitialValue').textContent = formatCurrency(initialValue);
       document.getElementById('resultInterest').textContent = formatCurrency(interestGained);
       document.getElementById('resultFinalValue').textContent = formatCurrency(finalValue);
-      document.getElementById('resultMonths').textContent = monthsDiff;
+      document.getElementById('resultMonths').textContent = daysDiff;
+      
+      // Calcular rentabilidade em %
+      const rentabilityPercent = ((finalValue - initialValue) / initialValue) * 100;
+      document.getElementById('resultRentability').textContent = rentabilityPercent.toFixed(2);
+      
+      // Calcular valor ganho por mês
+      const actualMonthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+                               (endDate.getMonth() - startDate.getMonth());
+      const monthlyGain = interestGained / Math.max(actualMonthsDiff, 1);
+      document.getElementById('resultMonthlyValue').textContent = formatCurrency(monthlyGain);
 
       // Gerar dados para o gráfico
-      generateSimulationChart(initialValue, rate, monthsDiff);
+      generateSimulationChart(initialValue, rateType === 'CDI' ? cdiRate : rateValue, 
+                             rateType, startDate, endDate, rateType === 'CDI' ? rateValue : null);
 
       showToast('Simulação calculada com sucesso!', 'success');
     }
 
+    function calculateBusinessDays(startDate, endDate) {
+      let count = 0;
+      let current = new Date(startDate);
+      
+      while (current < endDate) {
+        const dayOfWeek = current.getDay();
+        if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+          count++;
+        }
+        current.setDate(current.getDate() + 1);
+      }
+      
+      return count;
+    }
+
     function calculateSimulationRealtime() {
       const initialValue = parseFloat(document.getElementById('simulatorInitialValue').value) || 0;
-      const interestRate = parseFloat(document.getElementById('simulatorInterestRate').value) || 0;
       const startMonth = document.getElementById('simulatorStartMonth').value;
       const endMonth = document.getElementById('simulatorEndMonth').value;
+      const rateType = document.getElementById('simulatorRateType')?.value || 'FIXED';
+      const bankId = document.getElementById('simulatorBank')?.value;
+      let rateValue = parseFloat(document.getElementById('simulatorInterestRate').value) || 0;
+
+      // Se for CDI, obter percentual do banco
+      if (rateType === 'CDI' && bankId) {
+        const selectedBank = banks.find(b => b.id === bankId);
+        if (selectedBank) {
+          rateValue = selectedBank.cdi_percentage;
+        }
+      }
 
       // Se não houver dados completos, limpar os resultados
-      if (initialValue <= 0 || interestRate < 0 || !startMonth || !endMonth) {
+      if (initialValue <= 0 || rateValue < 0 || !startMonth || !endMonth) {
         document.getElementById('resultInitialValue').textContent = '0,00';
         document.getElementById('resultInterest').textContent = '0,00';
         document.getElementById('resultFinalValue').textContent = '0,00';
         document.getElementById('resultMonths').textContent = '0';
+        document.getElementById('resultRentability').textContent = '0,00';
+        document.getElementById('resultMonthlyValue').textContent = '0,00';
         document.getElementById('simulationChart').innerHTML = '';
         return;
       }
 
-      // Calcular número de meses
-      const start = new Date(startMonth);
-      const end = new Date(endMonth);
-      const monthsDiff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth());
+      const startDate = new Date(startMonth + '-01');
+      const endDate = new Date(endMonth + '-01');
 
-      if (monthsDiff < 0) {
+      if (startDate >= endDate) {
         document.getElementById('resultInitialValue').textContent = '0,00';
         document.getElementById('resultInterest').textContent = '0,00';
         document.getElementById('resultFinalValue').textContent = '0,00';
         document.getElementById('resultMonths').textContent = '0';
+        document.getElementById('resultRentability').textContent = '0,00';
+        document.getElementById('resultMonthlyValue').textContent = '0,00';
         document.getElementById('simulationChart').innerHTML = '';
         return;
       }
 
-      // Calcular juros compostos: VF = VI * (1 + i)^n
-      const rate = interestRate / 100;
-      const finalValue = initialValue * Math.pow(1 + rate, monthsDiff);
-      const interestGained = finalValue - initialValue;
+      // Calcular resultado
+      let finalValue, interestGained, daysDiff;
+
+      if (rateType === 'CDI') {
+        daysDiff = calculateBusinessDays(startDate, endDate);
+        const cdiDaily = Math.pow(1 + (cdiRate / 100), 1 / 252) - 1;
+        const dailyReturn = cdiDaily * (rateValue / 100);
+        finalValue = initialValue * Math.pow(1 + dailyReturn, daysDiff);
+        interestGained = finalValue - initialValue;
+      } else {
+        const monthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+                          (endDate.getMonth() - startDate.getMonth());
+        daysDiff = monthsDiff;
+        const rate = rateValue / 100;
+        finalValue = initialValue * Math.pow(1 + rate, monthsDiff);
+        interestGained = finalValue - initialValue;
+      }
 
       // Atualizar resultados
       document.getElementById('resultInitialValue').textContent = formatCurrency(initialValue);
       document.getElementById('resultInterest').textContent = formatCurrency(interestGained);
       document.getElementById('resultFinalValue').textContent = formatCurrency(finalValue);
-      document.getElementById('resultMonths').textContent = monthsDiff;
+      document.getElementById('resultMonths').textContent = daysDiff;
+      
+      const rentabilityPercent = ((finalValue - initialValue) / initialValue) * 100;
+      document.getElementById('resultRentability').textContent = rentabilityPercent.toFixed(2);
+      
+      // Calcular valor ganho por mês
+      const actualMonthsDiff = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+                               (endDate.getMonth() - startDate.getMonth());
+      const monthlyGain = interestGained / Math.max(actualMonthsDiff, 1);
+      document.getElementById('resultMonthlyValue').textContent = formatCurrency(monthlyGain);
 
       // Gerar dados para o gráfico
-      generateSimulationChart(initialValue, rate, monthsDiff);
+      generateSimulationChart(initialValue, rateType === 'CDI' ? cdiRate : rateValue, 
+                             rateType, startDate, endDate, rateType === 'CDI' ? rateValue : null);
     }
 
-    function generateSimulationChart(initialValue, rate, months) {
+    function generateSimulationChart(initialValue, baseRate, rateType, startDate, endDate, bankPercentage = null) {
       const chartContainer = document.getElementById('simulationChart');
       const data = [];
       
-      for (let i = 0; i <= months; i++) {
-        const value = initialValue * Math.pow(1 + rate, i);
-        data.push({ month: i, value: value });
+      // Armazenar parâmetros para regeneração ao mudar granularidade
+      lastSimulationParams = {
+        initialValue,
+        baseRate,
+        rateType,
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        bankPercentage
+      };
+
+      const granularity = chartGranularity || 'month';
+
+      if (granularity === 'day') {
+        generateChartByDay(data, initialValue, baseRate, rateType, startDate, endDate, bankPercentage);
+      } else if (granularity === 'month') {
+        generateChartByMonth(data, initialValue, baseRate, rateType, startDate, endDate, bankPercentage);
+      } else if (granularity === 'year') {
+        generateChartByYear(data, initialValue, baseRate, rateType, startDate, endDate, bankPercentage);
       }
 
-      // Criar uma visualização simples com barras
-      let html = '<div class="overflow-x-auto"><div class="flex gap-1" style="height: 300px; align-items: flex-end;">';
-      
+      // Renderizar gráfico
+      renderChart(chartContainer, data, initialValue, granularity);
+    }
+
+    function generateChartByDay(data, initialValue, baseRate, rateType, startDate, endDate, bankPercentage) {
+      let current = new Date(startDate);
+      let dayCount = 0;
+
+      if (rateType === 'CDI') {
+        const cdiDaily = Math.pow(1 + (baseRate / 100), 1 / 252) - 1;
+        const dailyReturn = cdiDaily * (bankPercentage / 100);
+        
+        while (current < endDate) {
+          const dayOfWeek = current.getDay();
+          if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+            const value = initialValue * Math.pow(1 + dailyReturn, dayCount);
+            data.push({ 
+              period: dayCount, 
+              value: value, 
+              label: `Dia ${dayCount + 1}` 
+            });
+            dayCount++;
+          }
+          current.setDate(current.getDate() + 1);
+        }
+      } else {
+        // Para taxa fixa, mostrar progressão diária
+        const rate = baseRate / 100;
+        const dailyRate = Math.pow(1 + rate, 1 / 30) - 1; // Aproximação: 30 dias por mês
+        
+        while (current < endDate) {
+          const value = initialValue * Math.pow(1 + dailyRate, dayCount);
+          data.push({ 
+            period: dayCount, 
+            value: value, 
+            label: `Dia ${dayCount + 1}` 
+          });
+          current.setDate(current.getDate() + 1);
+          dayCount++;
+        }
+      }
+    }
+
+    function generateChartByMonth(data, initialValue, baseRate, rateType, startDate, endDate, bankPercentage) {
+      let current = new Date(startDate);
+      let monthCount = 0;
+
+      if (rateType === 'CDI') {
+        const cdiDaily = Math.pow(1 + (baseRate / 100), 1 / 252) - 1;
+        const dailyReturn = cdiDaily * (bankPercentage / 100);
+        
+        while (current < endDate) {
+          // Calcular dias úteis acumulados até este mês
+          let totalDays = 0;
+          let countDate = new Date(startDate);
+          while (countDate < new Date(current.getFullYear(), current.getMonth() + 1, 1) && countDate < endDate) {
+            const dayOfWeek = countDate.getDay();
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+              totalDays++;
+            }
+            countDate.setDate(countDate.getDate() + 1);
+          }
+          
+          const value = initialValue * Math.pow(1 + dailyReturn, totalDays);
+          data.push({ 
+            month: monthCount, 
+            value: value, 
+            label: `Mês ${monthCount}` 
+          });
+          
+          current.setMonth(current.getMonth() + 1);
+          monthCount++;
+        }
+      } else {
+        const rate = baseRate / 100;
+        while (current < endDate) {
+          const value = initialValue * Math.pow(1 + rate, monthCount);
+          data.push({ 
+            month: monthCount, 
+            value: value, 
+            label: `Mês ${monthCount}` 
+          });
+          
+          current.setMonth(current.getMonth() + 1);
+          monthCount++;
+        }
+      }
+    }
+
+    function generateChartByYear(data, initialValue, baseRate, rateType, startDate, endDate, bankPercentage) {
+      let current = new Date(startDate);
+      let yearCount = 0;
+
+      if (rateType === 'CDI') {
+        const cdiDaily = Math.pow(1 + (baseRate / 100), 1 / 252) - 1;
+        const dailyReturn = cdiDaily * (bankPercentage / 100);
+        
+        while (current < endDate) {
+          // Calcular dias úteis acumulados até este ano
+          let totalDays = 0;
+          let countDate = new Date(startDate);
+          while (countDate < new Date(current.getFullYear() + 1, 0, 1) && countDate < endDate) {
+            const dayOfWeek = countDate.getDay();
+            if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+              totalDays++;
+            }
+            countDate.setDate(countDate.getDate() + 1);
+          }
+          
+          const value = initialValue * Math.pow(1 + dailyReturn, totalDays);
+          data.push({ 
+            year: yearCount, 
+            value: value, 
+            label: `Ano ${yearCount}` 
+          });
+          
+          current.setFullYear(current.getFullYear() + 1);
+          yearCount++;
+        }
+      } else {
+        const rate = baseRate / 100;
+        while (current < endDate) {
+          const value = initialValue * Math.pow(1 + rate, yearCount * 12);
+          data.push({ 
+            year: yearCount, 
+            value: value, 
+            label: `Ano ${yearCount}` 
+          });
+          
+          current.setFullYear(current.getFullYear() + 1);
+          yearCount++;
+        }
+      }
+    }
+
+    function renderChart(chartContainer, data, initialValue, granularity) {
+      if (data.length === 0) {
+        chartContainer.innerHTML = '<div class="text-center text-gray-400 py-8">📊 Selecione um período válido para visualizar o gráfico</div>';
+        return;
+      }
+
+      const width = chartContainer.offsetWidth || 800;
+      const height = 300;
+      const padding = 40;
+      const innerWidth = width - padding * 2;
+      const innerHeight = height - padding * 2;
+
       const maxValue = data[data.length - 1].value;
       const minValue = initialValue;
-      const range = maxValue - minValue;
+      const range = maxValue - minValue || 1;
 
-      data.forEach((item, index) => {
-        const percentage = ((item.value - minValue) / range) * 100;
-        const tooltipValue = formatCurrency(item.value);
+      // Calcular pontos do gráfico
+      const points = data.map((item, i) => {
+        const x = (i / (data.length - 1 || 1)) * innerWidth + padding;
+        const y = height - padding - ((item.value - minValue) / range) * innerHeight;
+        return { x, y, ...item };
+      });
+
+      // Criar caminho da linha
+      const pathData = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
+      let html = `
+        <div class="relative w-full overflow-x-auto">
+          <svg width="100%" height="${height}" viewBox="0 0 ${width} ${height}" preserveAspectRatio="xMidYMid meet" style="min-width: 100%;">
+            <!-- Gradiente de fundo -->
+            <defs>
+              <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:0.3" />
+                <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:0" />
+              </linearGradient>
+            </defs>
+
+            <!-- Grid horizontal -->
+            <g stroke="#374151" stroke-width="0.5" opacity="0.3">
+      `;
+
+      // Adicionar linhas de grade
+      for (let i = 0; i <= 4; i++) {
+        const y = padding + (i / 4) * innerHeight;
+        html += `<line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}" />`;
+      }
+
+      html += `
+            </g>
+
+            <!-- Eixo X -->
+            <line x1="${padding}" y1="${height - padding}" x2="${width - padding}" y2="${height - padding}" stroke="#6b7280" stroke-width="1" />
+            
+            <!-- Eixo Y -->
+            <line x1="${padding}" y1="${padding}" x2="${padding}" y2="${height - padding}" stroke="#6b7280" stroke-width="1" />
+
+            <!-- Área sob a linha -->
+            <path d="${pathData} L ${points[points.length - 1].x} ${height - padding} Z" fill="url(#areaGradient)" />
+
+            <!-- Linha principal -->
+            <path d="${pathData}" stroke="#3b82f6" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+
+            <!-- Pontos e hitarea -->
+      `;
+
+      points.forEach((point, i) => {
         html += `
-          <div class="flex-1 bg-gradient-to-t from-green-500 to-green-400 rounded-t transition-all hover:from-green-600 hover:to-green-500 cursor-pointer relative group" 
-               style="height: ${percentage}%; min-height: 20px;" 
-               title="Mês ${item.month}: ${tooltipValue}">
-            <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-800 text-white text-xs px-2 py-1 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity">
-              Mês ${item.month}: ${tooltipValue}
-            </div>
-          </div>
+          <g class="hover-group" style="cursor: pointer;">
+            <circle cx="${point.x}" cy="${point.y}" r="6" fill="#3b82f6" opacity="0" class="hover-circle" />
+            <circle cx="${point.x}" cy="${point.y}" r="4" fill="#60a5fa" class="point-inner" />
+            <circle cx="${point.x}" cy="${point.y}" r="6" fill="none" stroke="#3b82f6" stroke-width="2" opacity="0" class="hover-ring" />
+            
+            <!-- Tooltip -->
+            <g class="tooltip-group" opacity="0" style="pointer-events: none;">
+              <rect x="${point.x - 50}" y="${point.y - 35}" width="100" height="30" rx="4" fill="#1f2937" />
+              <text x="${point.x}" y="${point.y - 15}" text-anchor="middle" fill="white" font-size="12" font-weight="bold">${point.label}</text>
+              <text x="${point.x}" y="${point.y - 3}" text-anchor="middle" fill="#4ade80" font-size="11">${formatCurrency(point.value)}</text>
+            </g>
+          </g>
         `;
       });
 
-      html += '</div></div>';
+      html += `
+          </svg>
+        </div>
+
+        <style>
+          .hover-group:hover .hover-circle { opacity: 1 !important; }
+          .hover-group:hover .hover-ring { opacity: 1 !important; }
+          .hover-group:hover .tooltip-group { opacity: 1 !important; }
+        </style>
+      `;
+
       chartContainer.innerHTML = html;
+    }
+
+    function changeChartGranularity(granularity) {
+      chartGranularity = granularity;
+      
+      // Atualizar botões
+      document.getElementById('filterDay').classList.remove('active-filter');
+      document.getElementById('filterMonth').classList.remove('active-filter');
+      document.getElementById('filterYear').classList.remove('active-filter');
+      
+      if (granularity === 'day') {
+        document.getElementById('filterDay').classList.add('active-filter');
+      } else if (granularity === 'month') {
+        document.getElementById('filterMonth').classList.add('active-filter');
+      } else if (granularity === 'year') {
+        document.getElementById('filterYear').classList.add('active-filter');
+      }
+      
+      // Regenerar gráfico com os últimos parâmetros
+      if (Object.keys(lastSimulationParams).length > 0) {
+        const params = lastSimulationParams;
+        generateSimulationChart(
+          params.initialValue, 
+          params.baseRate, 
+          params.rateType, 
+          params.startDate, 
+          params.endDate, 
+          params.bankPercentage
+        );
+      }
+    }
+
+    function loadSimulatorUI() {
+      // Preencher dropdown de bancos
+      const bankSelect = document.getElementById('simulatorBank');
+      console.log('loadSimulatorUI chamada - bankSelect:', bankSelect, 'banks:', banks);
+      if (bankSelect) {
+        if (banks.length > 0) {
+          bankSelect.innerHTML = '<option value="">-- Personalizado --</option>' + 
+            banks.map(b => `<option value="${b.id}">${b.name} (${b.cdi_percentage}% do CDI)</option>`).join('');
+          console.log('Select preenchido com', banks.length, 'bancos');
+        } else {
+          console.warn('Nenhum banco disponível para preencher o select');
+          bankSelect.innerHTML = '<option value="">-- Personalizado --</option>';
+        }
+      } else {
+        console.warn('Elemento simulatorBank não encontrado no DOM');
+      }
+
+      // Event listener para selecionar banco
+      if (bankSelect) {
+        bankSelect.addEventListener('change', function() {
+          if (this.value) {
+            const selectedBank = banks.find(b => b.id === this.value);
+            if (selectedBank) {
+              document.getElementById('simulatorRateType').value = 'CDI';
+              document.getElementById('simulatorInterestRate').value = selectedBank.cdi_percentage;
+              calculateSimulationRealtime();
+            }
+          }
+        });
+      }
+
+      // Event listener para tipo de taxa
+      const rateTypeSelect = document.getElementById('simulatorRateType');
+      if (rateTypeSelect) {
+        rateTypeSelect.addEventListener('change', function() {
+          const interestInput = document.getElementById('simulatorInterestRate');
+          if (this.value === 'CDI') {
+            interestInput.placeholder = '% do CDI';
+            interestInput.value = '';
+          } else {
+            interestInput.placeholder = '% ao mês';
+            interestInput.value = '';
+          }
+          calculateSimulationRealtime();
+        });
+      }
     }
 
     function updateUI() {
@@ -800,17 +1393,17 @@
       // Calcula saldo acumulado de TODOS os meses ANTERIORES ao visualizado (APENAS transações reais)
       let accumulatedBalance = 0;
       
-      // Filtra TODAS as transações ANTERIORES ao mês visualizado (excluindo ajustes)
+      // Filtra TODAS as transações ANTERIORES ao mês visualizado
       const viewMonthKey = viewYear * 12 + viewMonth;
       const currentMonthKey = currentYear * 12 + currentMonth;
       
       const previousTransactions = transactions.filter(t => {
         const tDate = new Date(t.date + 'T00:00:00');
         const transactionMonthKey = tDate.getFullYear() * 12 + tDate.getMonth();
-        return transactionMonthKey < viewMonthKey && t.type !== 'ajuste';
+        return transactionMonthKey < viewMonthKey;
       });
 
-      // Calcula saldo acumulado (receitas - despesas não-crédito - pagamentos de fatura)
+      // Calcula saldo acumulado (receitas - despesas não-crédito + ajustes)
       previousTransactions.forEach(t => {
         if (t.type === 'receita') {
           accumulatedBalance += parseFloat(t.amount);
@@ -820,6 +1413,9 @@
             accumulatedBalance -= parseFloat(t.amount);
           }
           // Compras no crédito NÃO descontam do saldo até a fatura ser paga
+        } else if (t.type === 'ajuste') {
+          // Ajustes são adicionados ao saldo
+          accumulatedBalance += parseFloat(t.amount);
         }
       });
 
@@ -842,11 +1438,16 @@
         }
       }
 
-      // Transações REAIS do mês visualizado (excluindo ajustes)
+      // Transações REAIS do mês visualizado
       const monthTransactions = transactions.filter(t => {
         const tDate = new Date(t.date + 'T00:00:00');
-        return tDate.getMonth() === viewMonth && tDate.getFullYear() === viewYear && t.type !== 'ajuste';
+        return tDate.getMonth() === viewMonth && tDate.getFullYear() === viewYear;
       });
+
+      // Ajustes do mês (para cálculo de saldo)
+      const monthAdjustments = monthTransactions
+        .filter(t => t.type === 'ajuste')
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
       // Recorrências do mês visualizado (separadas em reais e projetadas)
       const projectedRecurrings = getProjectedRecurringTransactions(viewMonth, viewYear);
@@ -862,13 +1463,31 @@
           .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
       // Calcula despesas TOTAIS do mês (INCLUINDO crédito à vista, parcelado e recorrente)
-      // NÃO inclui NENHUM tipo de pagamento (pagamento_fatura, pagamento_recorrente)
+      // NÃO inclui pagamentos (pagamento_fatura, debito, dinheiro que são pagamentos)
       // porque pagamento não é consumo/despesa, é apenas liquidação de dívida
+      // Para evitar contagem dupla: ou conta o gasto EM CRÉDITO ou quando paga, nunca os dois
       const realExpensesTotal = monthTransactions
-        .filter(t => t.type === 'despesa' && t.payment_method !== 'pagamento_fatura' && t.payment_method !== 'pagamento_recorrente')
+        .filter(t => {
+          // Contar APENAS despesas reais: crédito, débito, dinheiro
+          // NÃO contar pagamentos de fatura (porque já contou quando foi gasto em crédito)
+          if (t.type !== 'despesa') return false;
+          
+          // Excluir pagamentos de fatura/recorrente (são liquidações, não gastos)
+          if (t.description && (t.description.includes('Pagamento Fatura') || t.description.includes('Pagamento Recorrente'))) {
+            return false;
+          }
+          
+          return true;
+        })
         .reduce((sum, t) => sum + parseFloat(t.amount), 0) +
         realRecurrings
-          .filter(t => t.type === 'despesa' && t.payment_method !== 'pagamento_fatura' && t.payment_method !== 'pagamento_recorrente')
+          .filter(t => {
+            if (t.type !== 'despesa') return false;
+            if (t.description && (t.description.includes('Pagamento Fatura') || t.description.includes('Pagamento Recorrente'))) {
+              return false;
+            }
+            return true;
+          })
           .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
       // Calcula despesas que afetam o SALDO
@@ -902,16 +1521,12 @@
           })
           .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
-      // Saldo real do mês (só desconta despesas não-crédito)
-      const monthBalance = realIncome - realExpensesForBalance;
+      // Saldo real do mês (só desconta despesas não-crédito + adiciona ajustes)
+      const monthBalance = realIncome - realExpensesForBalance + monthAdjustments;
       let totalBalance = accumulatedBalance + monthBalance;
       
-      // Aplicar ajuste manual se existir
-      const adjustments = JSON.parse(localStorage.getItem('manualBalanceAdjustments') || '{}');
-      if (adjustments[currentUser.id] !== undefined) {
-        // Se há ajuste manual, ele define o saldo total
-        totalBalance = adjustments[currentUser.id];
-      }
+      // Saldo agora é APENAS baseado em transações reais (incluindo ajustes)
+      // Os ajustes foram somados acima em accumulatedBalance e monthAdjustments
 
       // Para o mês ATUAL ou FUTURO, mostra projeções SEPARADAMENTE (apenas futuras)
       let projectedIncome = 0;
@@ -919,24 +1534,23 @@
       let projectedExpensesForBalance = 0;
       let hasProjections = false;
 
-      if (isCurrentMonth || isFutureMonth) {
-        hasProjections = futureRecurrings.length > 0;
+      // Calcular projeções de recorrências para QUALQUER mês
+      hasProjections = futureRecurrings.length > 0;
 
-        if (hasProjections) {
-          projectedIncome = futureRecurrings
-            .filter(t => t.type === 'receita')
-            .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      if (hasProjections) {
+        projectedIncome = futureRecurrings
+          .filter(t => t.type === 'receita')
+          .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
-          // Todas as despesas projetadas (incluindo crédito)
-          projectedExpensesTotal = futureRecurrings
-            .filter(t => t.type === 'despesa')
-            .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+        // Todas as despesas projetadas (incluindo crédito)
+        projectedExpensesTotal = futureRecurrings
+          .filter(t => t.type === 'despesa')
+          .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
-          // Despesas projetadas que afetam saldo (sem crédito)
-          projectedExpensesForBalance = futureRecurrings
-            .filter(t => t.type === 'despesa' && t.payment_method !== 'credito')
-            .reduce((sum, t) => sum + parseFloat(t.amount), 0);
-        }
+        // Despesas projetadas que afetam saldo (sem crédito)
+        projectedExpensesForBalance = futureRecurrings
+          .filter(t => t.type === 'despesa' && t.payment_method !== 'credito')
+          .reduce((sum, t) => sum + parseFloat(t.amount), 0);
       }
 
       const balanceEl = document.getElementById('totalBalance');
@@ -944,30 +1558,30 @@
       const expensesEl = document.getElementById('monthExpenses');
 
       // SALDO TOTAL (só considera despesas não-crédito)
-      if (isFutureMonth) {
-        // Para meses futuros, sempre mostra projeção (com ou sem recorrências)
+      if (hasProjections) {
+        // Se há projeções de recorrências, mostra o total com projeção
         const projectedBalance = totalBalance + projectedIncome - projectedExpensesForBalance;
-        balanceEl.innerHTML = `${formatCurrency(projectedBalance)} <span class="text-xs text-blue-400 ml-1">📊 Projetado</span>`;
-        animateNumber(balanceEl, projectedBalance, projectedBalance >= 0);
-        // Mudar cor baseado no saldo projetado
-        if (projectedBalance < 0) {
-          balanceEl.className = 'text-3xl font-bold text-red-500';
+        if (isFutureMonth) {
+          // Para meses futuros, mostra como "Projetado"
+          balanceEl.innerHTML = `${formatCurrency(projectedBalance)} <span class="text-xs text-blue-400 ml-1">📊 Projetado</span>`;
+          animateNumber(balanceEl, projectedBalance, projectedBalance >= 0);
+        } else if (isCurrentMonth) {
+          // Para mês atual, mostra "X (Y projetado)"
+          balanceEl.innerHTML = `${formatCurrency(totalBalance)} <span class="text-xs text-gray-500 ml-1">(${formatCurrency(projectedBalance)} projetado)</span>`;
+          animateNumber(balanceEl, totalBalance, totalBalance >= 0);
         } else {
-          balanceEl.className = 'text-3xl font-bold text-green-500';
+          // Para meses passados, mostra o saldo real com a nota de recorrências
+          balanceEl.innerHTML = `${formatCurrency(totalBalance)} <span class="text-xs text-gray-500 ml-1">(com recorrências)</span>`;
+          animateNumber(balanceEl, totalBalance, totalBalance >= 0);
         }
-      } else if (isCurrentMonth && hasProjections) {
-        // Para mês atual, mostra saldo real + projeção do que falta
-        const projectedBalance = totalBalance + projectedIncome - projectedExpensesForBalance;
-        balanceEl.innerHTML = `${formatCurrency(totalBalance)} <span class="text-xs text-gray-500 ml-1">(${formatCurrency(projectedBalance)} projetado)</span>`;
-        animateNumber(balanceEl, totalBalance, totalBalance >= 0);
-        // Mudar cor baseado no saldo real
+        // Mudar cor baseado no saldo
         if (totalBalance < 0) {
           balanceEl.className = 'text-3xl font-bold text-red-500';
         } else {
           balanceEl.className = 'text-3xl font-bold text-green-500';
         }
       } else {
-        // Para meses passados ou mês atual sem projeção, mostra apenas saldo real
+        // Sem projeções, mostra apenas o saldo real
         balanceEl.textContent = formatCurrency(totalBalance);
         animateNumber(balanceEl, totalBalance, totalBalance >= 0);
         // Mudar cor baseado no saldo real
@@ -1086,17 +1700,21 @@
 
       // 3. SUBTRAIR PAGAMENTOS JÁ REALIZADOS NO MÊS ATUAL
       // Reduz o bloqueio conforme os pagamentos são feitos
+      // Procura pela descrição "Pagamento Fatura" em vez do payment_method
       const paymentsThisMonth = transactions
-        .filter(t => t.payment_method === 'pagamento_fatura' && 
-                     t.description && 
-                     t.description.includes(card.name))
         .filter(t => {
+          if (!t.description || !t.description.includes(`Pagamento Fatura - ${card.name}`)) {
+            return false;
+          }
+          
           const tDate = new Date(t.date + 'T00:00:00');
           return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
         })
         .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
       blockedLimit -= paymentsThisMonth;
+      
+      console.log(`💳 ${card.name}: Bloqueado=${blockedLimit + paymentsThisMonth}, Pagamentos=${paymentsThisMonth}, Disponível=${Math.max(0, blockedLimit)}`);
       
       // Garantir que não fica negativo
       blockedLimit = Math.max(0, blockedLimit);
@@ -1129,18 +1747,25 @@
         .filter(t => t.card_id === cardId && t.type === 'despesa' && t.payment_method === 'credito')
         .reduce((sum, t) => sum + parseFloat(t.amount), 0);
       
-      // Subtrair pagamentos já feitos no mês atual
+      // Subtrair pagamentos já feitos no mês atual (procura pela descrição que começa com "Pagamento Fatura")
+      const paymentPattern = `Pagamento Fatura - ${card.name}`;
       const paymentsThisMonth = transactions
-        .filter(t => t.payment_method === 'pagamento_fatura' && 
-                     t.description && 
-                     t.description.includes(card.name))
         .filter(t => {
+          if (!t.description || !t.description.includes(paymentPattern)) {
+            return false;
+          }
+          
           const tDate = new Date(t.date + 'T00:00:00');
           return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
         })
         .reduce((sum, t) => sum + parseFloat(t.amount), 0);
       
       const totalInvoice = realTransactions + recurringTransactions - paymentsThisMonth;
+      
+      // Debug
+      if (paymentsThisMonth > 0 || realTransactions > 0 || recurringTransactions > 0) {
+        console.log(`📊 Fatura ${card.name}: Real=${realTransactions}, Recorrente=${recurringTransactions}, Pagamentos=${paymentsThisMonth}, Total=${totalInvoice}`);
+      }
       
       // Garantir que não fica negativo
       return Math.max(0, totalInvoice);
@@ -1293,9 +1918,8 @@
       });
 
       let projectedRecurrings = [];
-      if (isFutureMonth) {
-        projectedRecurrings = getProjectedRecurringTransactions(viewMonth, viewYear);
-      }
+      // Obter recorrências projetadas para QUALQUER mês (não só meses futuros)
+      projectedRecurrings = getProjectedRecurringTransactions(viewMonth, viewYear);
 
       const allTransactions = [...filteredTransactions, ...projectedRecurrings];
 
@@ -1325,11 +1949,11 @@
         } else if (isCreditPurchase) {
           color = 'text-yellow-500';
           icon = '💳';
-          label = '<span class="text-xs bg-yellow-900 text-yellow-300 px-2 py-1 rounded ml-2">Fatura</span>';
+          label = '<span class="badge-status">Fatura</span>';
         } else if (isInvoicePayment) {
           color = 'text-blue-500';
           icon = '💰';
-          label = '<span class="text-xs bg-blue-900 text-blue-300 px-2 py-1 rounded ml-2">Pagamento</span>';
+          label = '<span class="badge-status">Pagamento</span>';
         } else {
           color = 'text-red-500';
           icon = '↓';
@@ -1337,43 +1961,39 @@
         }
         
         const projectedClass = isProjected ? 'projected' : '';
-        const projectedLabel = isProjected ? '<span class="text-xs bg-blue-900 text-blue-300 px-2 py-1 rounded ml-2">📊 Projeção</span>' : '';
+        const projectedLabel = isProjected ? '<span class="badge-projected">📊 Projeção</span>' : '';
         
         return `
           <div class="transaction-item ${projectedClass}">
-            <div class="flex items-center justify-between">
-              <div class="flex-1">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="${color} text-xl font-bold">${icon}</span>
-                  <h4 class="font-semibold">${t.description}</h4>
-                  ${label}
-                  ${projectedLabel}
+            <div class="transaction-header">
+              <div class="transaction-icon ${color}">${icon}</div>
+              <div class="transaction-main">
+                <div class="transaction-title-row">
+                  <h4 class="transaction-description">${t.description}</h4>
+                  ${label}${projectedLabel}
                 </div>
-                <div class="flex items-center gap-3 text-sm text-gray-400">
-                  <span>${formatDate(t.date)}</span>
-                  <span>•</span>
-                  <span>${t.category}</span>
-                  ${t.payment_method && !isInvoicePayment ? `<span>•</span><span>${t.payment_method}</span>` : ''}
-                  ${t.installments > 1 ? `<span>•</span><span>Parcela ${t.current_installment}/${t.installments}</span>` : ''}
+                <div class="transaction-meta">
+                  <span class="meta-item">${formatDate(t.date)}</span>
+                  <span class="meta-separator">•</span>
+                  <span class="meta-item">${t.category}</span>
+                  ${t.payment_method && !isInvoicePayment ? `<span class="meta-separator">•</span><span class="meta-item">${t.payment_method}</span>` : ''}
+                  ${t.installments > 1 ? `<span class="meta-separator">•</span><span class="meta-item">P${t.current_installment}/${t.installments}</span>` : ''}
                 </div>
               </div>
-              <div class="text-right flex items-center gap-3">
-                <p class="${color} text-xl font-bold">${isIncome ? '+' : isCreditPurchase ? '' : '-'} ${formatCurrency(t.amount)}</p>
-                ${!isProjected ? `
-                  <button onclick="openEditTransactionModal(${t.id})" class="text-blue-500 hover:text-blue-400 transition p-2 hover:bg-blue-900 hover:bg-opacity-20 rounded" title="Editar transação">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M3 17.25V19H5.25L15.8133 8.43671L13.5633 6.18671L3 16.75V17.25Z" fill="currentColor"/>
-                      <path d="M19.8042 6.13542L13.8654 0.196523C13.5757 -0.0931187 13.1262 -0.0931187 12.8365 0.196523L11.4719 1.56108C11.1822 1.85065 11.1822 2.30015 11.4719 2.58972L17.4108 8.52862C17.7004 8.81819 18.1499 8.81819 18.4396 8.52862L19.8042 7.16406C20.0939 6.87449 20.0939 6.42499 19.8042 6.13542Z" fill="currentColor"/>
-                    </svg>
-                  </button>
-                  <button onclick="deleteTransaction(${t.id}, '${t.description.replace(/'/g, "\\'")}', ${t.installments}, ${t.current_installment})" class="text-red-500 hover:text-red-400 transition p-2 hover:bg-red-900 hover:bg-opacity-20 rounded" title="Excluir transação">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <path d="M3 5H17M15 5V16C15 16.5523 14.5523 17 14 17H6C5.44772 17 5 16.5523 5 16V5M7 5V4C7 3.44772 7.44772 3 8 3H12C12.5523 3 13 3.44772 13 4V5M8 9V13M12 9V13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                    </svg>
-                  </button>
-                ` : ''}
+              <div class="transaction-amount ${color}">
+                ${isIncome ? '+' : isCreditPurchase ? '' : '-'}${formatCurrency(t.amount)}
               </div>
             </div>
+            ${!isProjected ? `
+              <div class="transaction-actions">
+                <button onclick="openEditTransactionModal('${t.id}')" class="action-btn edit-btn" title="Editar">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
+                <button onclick="deleteTransaction('${t.id}', '${t.description.replace(/'/g, "\\'")}', ${t.installments}, ${t.current_installment})" class="action-btn delete-btn" title="Deletar">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 5H17M15 5V16C15 16.5523 14.5523 17 14 17H6C5.44772 17 5 16.5523 5 16V5M7 5V4C7 3.44772 7.44772 3 8 3H12C12.5523 3 13 3.44772 13 4V5M8 9V13M12 9V13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </button>
+              </div>
+            ` : ''}
           </div>
         `;
       }).join('');
@@ -1490,7 +2110,14 @@
       return `
         <div class="stat-card border-l-4 border-l-green-500">
           <div class="mb-4">
-            <h3 class="text-lg font-semibold text-white mb-1">${card.name}</h3>
+            <div class="flex items-center gap-2">
+              <h3 class="text-lg font-semibold text-white">${card.name}</h3>
+              <button onclick="openAdjustInvoiceModal(${card.id}, ${currentMonthInvoice}, '${card.name}')" class="text-yellow-500 hover:text-yellow-400 transition p-1 hover:bg-yellow-900 hover:bg-opacity-20 rounded" title="Ajustar fatura">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+                </svg>
+              </button>
+            </div>
             <p class="text-xs text-gray-500">**** **** **** ${card.last_four || '****'}</p>
           </div>
 
@@ -1531,8 +2158,15 @@
               </button>
             ` : ''}
             
+            <button onclick="openEditCardModal(${card.id})" class="text-blue-500 hover:text-blue-400 transition p-2 hover:bg-blue-900 hover:bg-opacity-20 rounded" title="Editar cartão">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
+              </svg>
+            </button>
+            
             <button onclick="deleteCard(${card.id}, '${card.name}')" class="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold py-2 px-3 rounded-lg transition-colors duration-200" title="Excluir cartão">
               🗑️
+
             </button>
           </div>
         </div>
@@ -1562,9 +2196,14 @@
               <span class="text-sm text-gray-400">Saldo do Cartão</span>
               <span class="text-xl font-bold ${balanceColor}">${formatCurrency(balance)}</span>
             </div>
-            <button onclick="deleteCard(${card.id}, '${card.name}')" class="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-semibold py-2 px-3 rounded-lg transition-colors duration-200">
-              🗑️ Excluir Cartão
-            </button>
+            <div class="flex gap-2">
+              <button onclick="openEditCardModal(${card.id})" class="flex-1 text-blue-500 hover:text-blue-400 transition p-2 hover:bg-blue-900 hover:bg-opacity-20 rounded text-xs font-semibold" title="Editar cartão">
+                ✎️ Editar
+              </button>
+              <button onclick="deleteCard(${card.id}, '${card.name}')" class="flex-1 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold py-2 px-3 rounded-lg transition-colors duration-200">
+                🗑️ Excluir
+              </button>
+            </div>
           </div>
         </div>
       `;
@@ -1578,59 +2217,89 @@
         return;
       }
 
+      // Detectar tema
+      const isDark = document.documentElement.getAttribute('data-theme') === 'dark' || document.documentElement.getAttribute('data-theme') === null;
+
       container.innerHTML = goals.map(goal => {
         const progress = (goal.current_amount / goal.target_amount) * 100;
         const isCompleted = goal.current_amount >= goal.target_amount;
         const remaining = goal.target_amount - goal.current_amount;
+        const daysRemaining = goal.deadline ? Math.ceil((new Date(goal.deadline) - new Date()) / (1000 * 60 * 60 * 24)) : null;
+        const isOverdue = daysRemaining !== null && daysRemaining < 0;
+        const isNearDeadline = daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 30;
+
+        const statusBorderColor = isCompleted ? 'border-l-green-500' : 
+                                  isOverdue ? 'border-l-red-500' : 
+                                  isNearDeadline ? 'border-l-yellow-500' : 
+                                  'border-l-blue-500';
+
+        const progressColor = isCompleted ? '#10b981' :
+                             progress >= 75 ? '#3b82f6' :
+                             progress >= 50 ? '#06b6d4' :
+                             progress >= 25 ? '#eab308' : '#f97316';
+
+        const statusBadgeColor = isCompleted ? '#10b981' : 
+                                 isOverdue ? '#ef4444' : 
+                                 isNearDeadline ? '#eab308' : '';
 
         return `
-          <div class="stat-card ${isCompleted ? 'border-green-500' : ''} mb-4">
-            <div class="flex items-center justify-between mb-4">
-              <h3 class="text-xl font-bold">${goal.name}</h3>
-              <div class="flex gap-2">
-                ${isCompleted ? `
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <circle cx="12" cy="12" r="10" fill="#10b981"/>
-                    <path d="M8 12L11 15L16 9" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <div class="goal-item border-l-4 ${statusBorderColor}" style="background-color: ${isDark ? '#1a1a1a' : '#f9fafb'}; border-color: ${isDark ? '#2a2a2a' : '#e5e7eb'};">
+            <div class="goal-header">
+              <div class="goal-main">
+                <div class="goal-title-row">
+                  <h3 class="goal-title" style="color: ${isDark ? '#ffffff' : '#111827'}">${goal.name}</h3>
+                  ${isCompleted ? `<span class="goal-badge completed">✓</span>` : isOverdue ? `<span class="goal-badge overdue">⚠️</span>` : isNearDeadline ? `<span class="goal-badge deadline">${daysRemaining}d</span>` : ''}
+                </div>
+                <div class="goal-meta" style="color: ${isDark ? '#999999' : '#6b7280'}">${daysRemaining !== null ? (isOverdue ? `${Math.abs(daysRemaining)}d atrás` : `${daysRemaining}d restante`) : 'Sem prazo'}</div>
+              </div>
+              <div class="goal-actions">
+                <button onclick="openEditGoalModal(${goal.id})" class="action-btn edit-btn" title="Editar">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/>
                   </svg>
-                ` : ''}
-                <button onclick="deleteGoal(${goal.id}, '${goal.name}')" class="text-red-500 hover:text-red-400 text-xl" title="Excluir meta">×</button>
+                </button>
+                <button onclick="deleteGoal(${goal.id}, '${goal.name}')" class="action-btn delete-btn" title="Excluir">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 6h18"/><path d="M8 6v12c0 1.1.9 2 2 2h4c1.1 0 2-.9 2-2V6"/>
+                  </svg>
+                </button>
               </div>
             </div>
 
-            <div class="mb-4">
-              <div class="flex items-center justify-between text-sm mb-2">
-                <span class="text-gray-400">Progresso</span>
-                <span class="font-bold text-green-500">${progress.toFixed(0)}%</span>
+            <div class="goal-values">
+              <div class="goal-value-item">
+                <span class="goal-value-label">Acum</span>
+                <span class="goal-value-amount" style="color: #10b981">${formatCurrency(goal.current_amount)}</span>
               </div>
-              <div class="progress-bar">
-                <div class="progress-fill" style="width: ${Math.min(progress, 100)}%"></div>
+              <div class="goal-value-item">
+                <span class="goal-value-label">Meta</span>
+                <span class="goal-value-amount" style="color: #3b82f6">${formatCurrency(goal.target_amount)}</span>
               </div>
-              <div class="flex items-center justify-between text-sm mt-2">
-                <span class="text-gray-400">${formatCurrency(goal.current_amount)}</span>
-                <span class="text-gray-400">${formatCurrency(goal.target_amount)}</span>
+              <div class="goal-value-item">
+                <span class="goal-value-label">${isCompleted ? '+' : 'Falta'}</span>
+                <span class="goal-value-amount" style="color: ${isCompleted ? '#10b981' : '#f97316'}">${formatCurrency(Math.abs(remaining))}</span>
               </div>
-              ${!isCompleted ? `
-                <p class="text-xs text-gray-500 mt-2">Faltam: ${formatCurrency(remaining)}</p>
-              ` : ''}
             </div>
 
-            ${goal.deadline ? `
-              <p class="text-sm text-gray-400 mb-4">
-                <svg class="inline-block mr-1" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="2" y="3" width="12" height="11" rx="2" stroke="currentColor" stroke-width="1.5"/>
-                  <path d="M2 6H14M5 1V3M11 1V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <div class="goal-progress">
+              <div class="goal-progress-bar-container">
+                <div class="goal-progress-bar" style="width: ${Math.min(progress, 100)}%; background-color: ${progressColor}; box-shadow: 0 0 6px ${progressColor}40;"></div>
+              </div>
+              <span class="goal-progress-text">${progress.toFixed(0)}%</span>
+            </div>
+
+            <div class="goal-footer">
+              <button onclick="addGoalAmount(${goal.id}, '${goal.name}')" class="goal-btn add-btn">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M10 5V15M5 10H15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
-                Meta: ${formatDate(goal.deadline)}
-              </p>
-            ` : ''}
-
-            <div class="flex gap-2">
-              <button onclick="addGoalAmount(${goal.id}, '${goal.name}')" class="flex-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold py-2 px-3 rounded-lg transition-colors duration-200">
-                ➕ Adicionar
+                Adicionar
               </button>
-              <button onclick="withdrawGoalAmount(${goal.id}, '${goal.name}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold py-2 px-3 rounded-lg transition-colors duration-200">
-                ➖ Retirar
+              <button onclick="withdrawGoalAmount(${goal.id}, '${goal.name}')" class="goal-btn withdraw-btn">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M5 10H15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                Retirar
               </button>
             </div>
           </div>
@@ -1640,7 +2309,7 @@
 
     function renderGoalsPreview() {
       const container = document.getElementById('goalsPreview');
-      const preview = goals.slice(0, 3);
+      const preview = goals.slice(0, 4);
 
       if (preview.length === 0) {
         container.innerHTML = '<p class="text-gray-400 text-center py-4">Nenhuma meta cadastrada</p>';
@@ -1649,15 +2318,29 @@
 
       container.innerHTML = preview.map(goal => {
         const progress = (goal.current_amount / goal.target_amount) * 100;
+        const isCompleted = goal.current_amount >= goal.target_amount;
+        const remaining = goal.target_amount - goal.current_amount;
+        const daysRemaining = goal.deadline ? Math.ceil((new Date(goal.deadline) - new Date()) / (1000 * 60 * 60 * 24)) : null;
+        
+        const progressColor = isCompleted ? 'from-green-500 to-green-600' :
+                             progress >= 75 ? 'from-blue-500 to-blue-600' :
+                             progress >= 50 ? 'from-cyan-500 to-cyan-600' :
+                             progress >= 25 ? 'from-yellow-500 to-yellow-600' : 'from-orange-500 to-orange-600';
 
         return `
-          <div class="mb-4 last:mb-0">
+          <div class="bg-gradient-to-br ${progressColor} rounded-lg p-3 mb-3 last:mb-0 text-white shadow-lg hover:shadow-xl transition-shadow">
             <div class="flex items-center justify-between mb-2">
-              <span class="font-semibold">${goal.name}</span>
-              <span class="text-sm text-green-500">${progress.toFixed(0)}%</span>
+              <h4 class="font-bold text-sm truncate">${goal.name}</h4>
+              <span class="text-xs font-bold bg-white bg-opacity-20 px-2 py-1 rounded">${progress.toFixed(0)}%</span>
             </div>
-            <div class="progress-bar">
-              <div class="progress-fill" style="width: ${Math.min(progress, 100)}%"></div>
+            <div class="w-full bg-white bg-opacity-20 rounded-full h-2 mb-2 overflow-hidden">
+              <div class="h-full bg-white rounded-full" style="width: ${Math.min(progress, 100)}%; opacity: 0.8;"></div>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+              <span>${formatCurrency(goal.current_amount)} / ${formatCurrency(goal.target_amount)}</span>
+              ${daysRemaining !== null ? `
+                <span class="font-semibold">${daysRemaining > 0 ? daysRemaining + 'd' : 'Vencida'}</span>
+              ` : ''}
             </div>
           </div>
         `;
@@ -1666,33 +2349,228 @@
 
     function renderAchievements() {
       const container = document.getElementById('achievementsList');
+      const parentContainer = document.getElementById('achievementsContainer');
 
       const achievements = [
-        { id: 1, name: 'Primeira Transação', description: 'Registre sua primeira transação', unlocked: transactions.length >= 1, icon: '💰' },
-        { id: 2, name: 'Organizador', description: 'Registre 10 transações', unlocked: transactions.length >= 10, icon: '📊' },
-        { id: 3, name: 'Disciplinado', description: 'Registre 50 transações', unlocked: transactions.length >= 50, icon: '💪' },
-        { id: 4, name: 'Carteirinha', description: 'Cadastre seu primeiro cartão', unlocked: cards.length >= 1, icon: '💳' },
-        { id: 5, name: 'Sonhador', description: 'Crie sua primeira meta', unlocked: goals.length >= 1, icon: '🎯' },
-        { id: 6, name: 'Realizador', description: 'Complete uma meta', unlocked: goals.some(g => g.current_amount >= g.target_amount), icon: '🏆' },
-        { id: 7, name: 'No Azul', description: 'Tenha saldo positivo no mês', unlocked: checkPositiveBalance(), icon: '💰' },
-        { id: 8, name: 'Investidor', description: 'Registre uma receita de investimento', unlocked: transactions.some(t => t.category === 'Investimento'), icon: '📈' }
+        { id: 1, name: 'Primeira Transação', description: 'Registre sua primeira transação', unlocked: transactions.length >= 1, icon: '💰', rarity: 'comum', color: 'from-blue-600 to-blue-700' },
+        { id: 2, name: 'Organizador', description: 'Registre 10 transações', unlocked: transactions.length >= 10, icon: '📊', rarity: 'comum', color: 'from-green-600 to-green-700' },
+        { id: 3, name: 'Disciplinado', description: 'Registre 50 transações', unlocked: transactions.length >= 50, icon: '💪', rarity: 'raro', color: 'from-purple-600 to-purple-700' },
+        { id: 4, name: 'Carteirinha', description: 'Cadastre seu primeiro cartão', unlocked: cards.length >= 1, icon: '💳', rarity: 'comum', color: 'from-yellow-600 to-yellow-700' },
+        { id: 5, name: 'Sonhador', description: 'Crie sua primeira meta', unlocked: goals.length >= 1, icon: '🎯', rarity: 'comum', color: 'from-pink-600 to-pink-700' },
+        { id: 6, name: 'Realizador', description: 'Complete uma meta', unlocked: goals.some(g => g.current_amount >= g.target_amount), icon: '🏆', rarity: 'épico', color: 'from-orange-600 to-orange-700' },
+        { id: 7, name: 'No Azul', description: 'Tenha saldo positivo no mês', unlocked: checkPositiveBalance(), icon: '💚', rarity: 'raro', color: 'from-emerald-600 to-emerald-700' },
+        { id: 8, name: 'Investidor', description: 'Registre uma receita de investimento', unlocked: transactions.some(t => t.category === 'Investimento'), icon: '📈', rarity: 'épico', color: 'from-cyan-600 to-cyan-700' },
+        { id: 9, name: 'Economista', description: 'Registre 100 transações', unlocked: transactions.length >= 100, icon: '💵', rarity: 'raro', color: 'from-green-500 to-green-700' },
+        { id: 10, name: 'Estrategista', description: 'Crie 5 metas', unlocked: goals.length >= 5, icon: '🎲', rarity: 'raro', color: 'from-indigo-600 to-indigo-700' },
+        { id: 11, name: 'Executivo', description: 'Complete 3 metas', unlocked: goals.filter(g => g.current_amount >= g.target_amount).length >= 3, icon: '👔', rarity: 'épico', color: 'from-slate-600 to-slate-700' },
+        { id: 12, name: 'Colecionador', description: 'Cadastre 3 cartões diferentes', unlocked: cards.length >= 3, icon: '💎', rarity: 'raro', color: 'from-pink-500 to-pink-700' },
+        { id: 13, name: 'Controlador', description: 'Categorize todas as transações', unlocked: transactions.every(t => t.category), icon: '✅', rarity: 'raro', color: 'from-green-600 to-emerald-700' },
+        { id: 14, name: 'Milionário', description: 'Registre 500 transações', unlocked: transactions.length >= 500, icon: '🤑', rarity: 'épico', color: 'from-yellow-600 to-yellow-500' },
+        { id: 15, name: 'Consistente', description: 'Registre transações por 30 dias', unlocked: transactions.length >= 30, icon: '📅', rarity: 'raro', color: 'from-red-600 to-pink-700' },
+        { id: 16, name: 'Responsável', description: 'Registre uma meta com alta prioridade', unlocked: goals.some(g => g.priority === 3), icon: '⚡', rarity: 'comum', color: 'from-yellow-600 to-orange-700' },
+        { id: 17, name: 'Audacioso', description: 'Crie uma meta com mais de 1000', unlocked: goals.some(g => g.target_amount > 1000), icon: '🚀', rarity: 'raro', color: 'from-purple-600 to-blue-700' },
+        { id: 18, name: 'Perspicaz', description: 'Registre 10 transações recorrentes', unlocked: recurringTransactions.length >= 10, icon: '🔄', rarity: 'raro', color: 'from-teal-600 to-cyan-700' },
+        { id: 19, name: 'Visionário', description: 'Crie 10 metas diferentes', unlocked: goals.length >= 10, icon: '👁️', rarity: 'épico', color: 'from-indigo-600 to-purple-700' },
+        { id: 20, name: 'Lenda Financeira', description: 'Desbloqueie todas as conquistas', unlocked: false, icon: '👑', rarity: 'épico', color: 'from-orange-500 to-red-600' }
       ];
 
-      container.innerHTML = achievements.map(ach => `
-        <div class="achievement ${ach.unlocked ? 'unlocked' : ''}">
-          <div class="text-4xl">${ach.unlocked ? ach.icon : '🔒'}</div>
-          <div class="flex-1">
-            <h4 class="font-bold ${ach.unlocked ? 'text-green-500' : 'text-gray-500'}" style="color: ${ach.unlocked ? '#10b981' : '#7f8c8d'};">${ach.name}</h4>
-            <p class="text-sm text-gray-400" style="color: #7f8c8d;">${ach.description}</p>
+      const unlockedCount = achievements.filter(a => a.unlocked).length;
+      const completionPercent = Math.round((unlockedCount / achievements.length) * 100);
+      const itemsPerPage = 8;
+      const totalPages = Math.ceil(achievements.length / itemsPerPage);
+      const startIndex = achievementsPage * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const paginatedAchievements = achievements.slice(startIndex, endIndex);
+
+      let html = `
+        <!-- Progress Section -->
+        <div class="mb-8 bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 rounded-2xl p-6 border border-gray-700 shadow-lg">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-2xl font-bold text-white mb-1">Progresso de Conquistas</h3>
+              <p class="text-sm text-gray-400">Avance seu caminho para a excelência financeira</p>
+            </div>
+            <div class="text-right">
+              <div class="text-3xl font-black bg-gradient-to-r from-green-400 to-blue-500 bg-clip-text text-transparent">
+                ${completionPercent}%
+              </div>
+              <p class="text-xs text-gray-400 mt-1">${unlockedCount} de ${achievements.length}</p>
+            </div>
           </div>
-          ${ach.unlocked ? `
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="12" cy="12" r="10" fill="#10b981"/>
-              <path d="M8 12L11 15L16 9" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-          ` : ''}
+          
+          <div class="relative w-full h-3 bg-gray-700 rounded-full overflow-hidden shadow-inner">
+            <div class="absolute inset-0 bg-gradient-to-r from-green-500 via-blue-500 to-purple-500 rounded-full transition-all duration-700 ease-out" style="width: ${completionPercent}%"></div>
+          </div>
+          
+          <div class="flex justify-between mt-4">
+            <div class="text-center">
+              <div class="text-sm font-bold text-green-400">${unlockedCount}</div>
+              <div class="text-xs text-gray-500">Desbloqueadas</div>
+            </div>
+            <div class="text-center">
+              <div class="text-sm font-bold text-yellow-400">${achievements.filter(a => a.rarity === 'raro').filter(a => a.unlocked).length}</div>
+              <div class="text-xs text-gray-500">Raras</div>
+            </div>
+            <div class="text-center">
+              <div class="text-sm font-bold text-purple-400">${achievements.filter(a => a.rarity === 'épico').filter(a => a.unlocked).length}</div>
+              <div class="text-xs text-gray-500">Épicas</div>
+            </div>
+            <div class="text-center">
+              <div class="text-sm font-bold text-gray-400">${achievements.length - unlockedCount}</div>
+              <div class="text-xs text-gray-500">Bloqueadas</div>
+            </div>
+          </div>
         </div>
-      `).join('');
+
+        <!-- Achievements Grid -->
+        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5 mb-8">
+      `;
+
+      html += paginatedAchievements.map((ach, index) => {
+        const rarityEmoji = ach.rarity === 'épico' ? '⭐⭐⭐' : ach.rarity === 'raro' ? '⭐⭐' : '⭐';
+        const rarityLabel = ach.rarity === 'épico' ? 'Épica' : ach.rarity === 'raro' ? 'Rara' : 'Comum';
+        const rarityColor = ach.rarity === 'épico' ? 'from-yellow-500 to-orange-500' : ach.rarity === 'raro' ? 'from-purple-500 to-pink-500' : 'from-blue-500 to-cyan-500';
+
+        return `
+          <div class="group relative transform transition-all duration-300 hover:scale-105 ${!ach.unlocked ? 'opacity-70' : 'hover:shadow-2xl'}">
+            <div class="absolute inset-0 bg-gradient-to-r ${!ach.unlocked ? 'from-gray-800 to-gray-900' : ach.color} rounded-xl blur opacity-30 group-hover:opacity-60 transition duration-500"></div>
+            
+            <div class="relative bg-gray-900 border-2 ${!ach.unlocked ? 'border-gray-700' : `border-transparent bg-gradient-to-br ${ach.color} p-0.5`} rounded-xl overflow-hidden">
+              <div class="bg-gray-900 rounded-[9px] p-5 h-full flex flex-col">
+                <!-- Header with Icon and Status -->
+                <div class="flex items-start justify-between mb-4">
+                  <div class="relative">
+                    <div class="text-6xl filter transition-all duration-300 ${!ach.unlocked ? 'grayscale opacity-50' : 'drop-shadow-lg'}">
+                      ${ach.unlocked ? ach.icon : '🔒'}
+                    </div>
+                    ${ach.unlocked && ach.rarity === 'épico' ? `
+                      <div class="absolute -top-2 -right-2 animate-bounce">
+                        <div class="text-2xl">✨</div>
+                      </div>
+                    ` : ''}
+                  </div>
+                  
+                  <span class="inline-block bg-gradient-to-r ${rarityColor} text-white text-xs font-bold px-2 py-1 rounded-lg">
+                    ${ach.unlocked ? rarityEmoji : 'BLOQ'}
+                  </span>
+                </div>
+                
+                <!-- Title and Rarity -->
+                <h4 class="font-bold text-sm ${ach.unlocked ? 'text-white' : 'text-gray-500'} mb-1 line-clamp-2">${ach.name}</h4>
+                <p class="text-xs ${ach.unlocked ? `text-gray-300 bg-gradient-to-r ${rarityColor} bg-clip-text text-transparent` : 'text-gray-600'} font-semibold mb-3">
+                  ${ach.unlocked ? rarityLabel : 'Bloqueada'}
+                </p>
+                
+                <!-- Description -->
+                <p class="text-xs ${ach.unlocked ? 'text-gray-400' : 'text-gray-600'} mb-4 flex-grow line-clamp-2">${ach.description}</p>
+                
+                <!-- Status Footer -->
+                <div class="pt-3 border-t border-gray-800">
+                  ${ach.unlocked ? `
+                    <div class="flex items-center gap-2 text-xs font-semibold text-green-400">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="12" cy="12" r="10" fill="currentColor"/>
+                        <path d="M8 12L11 15L16 9" stroke="#111827" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                      <span>Desbloqueada!</span>
+                    </div>
+                  ` : `
+                    <div class="text-xs text-gray-500 font-medium">Trabalhe para desbloquear</div>
+                  `}
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      html += `
+        </div>
+      `;
+
+      // Pagination Controls
+      if (totalPages > 1) {
+        html += `
+          <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mt-10 pt-8 border-t border-gray-800">
+            <button 
+              onclick="previousAchievementsPage()" 
+              class="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
+                achievementsPage === 0 
+                  ? 'bg-gray-800 text-gray-600 cursor-not-allowed opacity-50' 
+                  : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:shadow-lg hover:shadow-blue-500/50'
+              }">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"></polyline>
+              </svg>
+              Anterior
+            </button>
+            
+            <div class="flex items-center gap-4">
+              <div class="text-sm font-bold">
+                <span class="text-white">Página ${achievementsPage + 1}</span>
+                <span class="text-gray-500"> de ${totalPages}</span>
+              </div>
+              <div class="h-8 w-px bg-gray-700"></div>
+              <div class="text-sm text-gray-400">
+                ${startIndex + 1}–${Math.min(endIndex, achievements.length)} de ${achievements.length}
+              </div>
+            </div>
+            
+            <button 
+              onclick="nextAchievementsPage()" 
+              class="flex items-center gap-2 px-6 py-3 rounded-lg font-semibold transition-all duration-300 ${
+                achievementsPage === totalPages - 1 
+                  ? 'bg-gray-800 text-gray-600 cursor-not-allowed opacity-50' 
+                  : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:shadow-lg hover:shadow-blue-500/50'
+              }">
+              Próxima
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+          </div>
+        `;
+      }
+
+      container.innerHTML = html;
+    }
+
+    function nextAchievementsPage() {
+      const achievements = [
+        { id: 1, name: 'Primeira Transação', description: 'Registre sua primeira transação', unlocked: transactions.length >= 1, icon: '💰', rarity: 'comum', color: 'from-blue-600 to-blue-700' },
+        { id: 2, name: 'Organizador', description: 'Registre 10 transações', unlocked: transactions.length >= 10, icon: '📊', rarity: 'comum', color: 'from-green-600 to-green-700' },
+        { id: 3, name: 'Disciplinado', description: 'Registre 50 transações', unlocked: transactions.length >= 50, icon: '💪', rarity: 'raro', color: 'from-purple-600 to-purple-700' },
+        { id: 4, name: 'Carteirinha', description: 'Cadastre seu primeiro cartão', unlocked: cards.length >= 1, icon: '💳', rarity: 'comum', color: 'from-yellow-600 to-yellow-700' },
+        { id: 5, name: 'Sonhador', description: 'Crie sua primeira meta', unlocked: goals.length >= 1, icon: '🎯', rarity: 'comum', color: 'from-pink-600 to-pink-700' },
+        { id: 6, name: 'Realizador', description: 'Complete uma meta', unlocked: goals.some(g => g.current_amount >= g.target_amount), icon: '🏆', rarity: 'épico', color: 'from-orange-600 to-orange-700' },
+        { id: 7, name: 'No Azul', description: 'Tenha saldo positivo no mês', unlocked: checkPositiveBalance(), icon: '💚', rarity: 'raro', color: 'from-emerald-600 to-emerald-700' },
+        { id: 8, name: 'Investidor', description: 'Registre uma receita de investimento', unlocked: transactions.some(t => t.category === 'Investimento'), icon: '📈', rarity: 'épico', color: 'from-cyan-600 to-cyan-700' },
+        { id: 9, name: 'Economista', description: 'Registre 100 transações', unlocked: transactions.length >= 100, icon: '💵', rarity: 'raro', color: 'from-green-500 to-green-700' },
+        { id: 10, name: 'Estrategista', description: 'Crie 5 metas', unlocked: goals.length >= 5, icon: '🎲', rarity: 'raro', color: 'from-indigo-600 to-indigo-700' },
+        { id: 11, name: 'Executivo', description: 'Complete 3 metas', unlocked: goals.filter(g => g.current_amount >= g.target_amount).length >= 3, icon: '👔', rarity: 'épico', color: 'from-slate-600 to-slate-700' },
+        { id: 12, name: 'Colecionador', description: 'Cadastre 3 cartões diferentes', unlocked: cards.length >= 3, icon: '💎', rarity: 'raro', color: 'from-pink-500 to-pink-700' },
+        { id: 13, name: 'Controlador', description: 'Categorize todas as transações', unlocked: transactions.every(t => t.category), icon: '✅', rarity: 'raro', color: 'from-green-600 to-emerald-700' },
+        { id: 14, name: 'Milionário', description: 'Registre 500 transações', unlocked: transactions.length >= 500, icon: '🤑', rarity: 'épico', color: 'from-yellow-600 to-yellow-500' },
+        { id: 15, name: 'Consistente', description: 'Registre transações por 30 dias', unlocked: transactions.length >= 30, icon: '📅', rarity: 'raro', color: 'from-red-600 to-pink-700' },
+        { id: 16, name: 'Responsável', description: 'Registre uma meta com alta prioridade', unlocked: goals.some(g => g.priority === 3), icon: '⚡', rarity: 'comum', color: 'from-yellow-600 to-orange-700' },
+        { id: 17, name: 'Audacioso', description: 'Crie uma meta com mais de 1000', unlocked: goals.some(g => g.target_amount > 1000), icon: '🚀', rarity: 'raro', color: 'from-purple-600 to-blue-700' },
+        { id: 18, name: 'Perspicaz', description: 'Registre 10 transações recorrentes', unlocked: recurringTransactions.length >= 10, icon: '🔄', rarity: 'raro', color: 'from-teal-600 to-cyan-700' },
+        { id: 19, name: 'Visionário', description: 'Crie 10 metas diferentes', unlocked: goals.length >= 10, icon: '👁️', rarity: 'épico', color: 'from-indigo-600 to-purple-700' },
+        { id: 20, name: 'Lenda Financeira', description: 'Desbloqueie todas as conquistas', unlocked: false, icon: '👑', rarity: 'épico', color: 'from-orange-500 to-red-600' }
+      ];
+      const itemsPerPage = 12;
+      const totalPages = Math.ceil(achievements.length / itemsPerPage);
+      if (achievementsPage < totalPages - 1) {
+        achievementsPage++;
+        renderAchievements();
+      }
+    }
+
+    function previousAchievementsPage() {
+      if (achievementsPage > 0) {
+        achievementsPage--;
+        renderAchievements();
+      }
     }
 
     function checkPositiveBalance() {
@@ -1828,35 +2706,40 @@
           const monthsPassed = (today.getFullYear() - startDate.getFullYear()) * 12 + (today.getMonth() - startDate.getMonth());
           const monthsLeft = Math.max(0, r.duration_months - monthsPassed);
           
-          expirationInfo = `<span class="text-xs text-yellow-500 ml-2">${monthsLeft} ${monthsLeft === 1 ? 'mês' : 'meses'} restantes</span>`;
+          expirationInfo = `<span class="recurring-expires">${monthsLeft}m</span>`;
         }
 
+        const durationBadge = isPermanent ? 
+          '<span class="recurring-badge permanent">♾️</span>' : 
+          '<span class="recurring-badge temporary">⏰</span>';
+
         return `
-          <div class="stat-card mb-4">
-            <div class="flex items-center justify-between">
-              <div class="flex-1">
-                <div class="flex items-center gap-3 mb-2">
-                  <span class="${color} text-2xl font-bold">${icon}</span>
-                  <div>
-                    <h4 class="font-bold text-lg">${r.description}</h4>
-                    <div class="flex items-center gap-2 mt-1">
-                      <span class="text-sm text-gray-400">${r.category}</span>
-                      <span class="text-sm text-gray-400">•</span>
-                      <span class="text-sm text-gray-400">Todo dia ${r.day_of_month}</span>
-                      ${isPermanent ? 
-                        '<span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded ml-2">♾️ Permanente</span>' : 
-                        '<span class="text-xs bg-yellow-900 text-yellow-300 px-2 py-1 rounded ml-2">⏰ Temporária</span>'}
-                      ${expirationInfo}
-                    </div>
-                  </div>
+          <div class="recurring-item">
+            <div class="recurring-header">
+              <div class="recurring-icon ${color}">${icon}</div>
+              <div class="recurring-main">
+                <div class="recurring-title">${r.description}</div>
+                <div class="recurring-meta">
+                  <span>${r.category}</span>
+                  <span>•</span>
+                  <span>D${r.day_of_month}</span>
+                  ${expirationInfo}
                 </div>
               </div>
-              <div class="text-right flex items-center gap-3">
-                <p class="${color} text-2xl font-bold">${isIncome ? '+' : '-'} ${formatCurrency(r.amount)}</p>
-                <button onclick="deleteRecurring(${r.id}, '${r.description}')" class="text-red-500 hover:text-red-400 transition p-2 hover:bg-red-900 hover:bg-opacity-20 rounded" title="Excluir recorrência">
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 5H17M15 5V16C15 16.5523 14.5523 17 14 17H6C5.44772 17 5 16.5523 5 16V5M7 5V4C7 3.44772 7.44772 3 8 3H12C12.5523 3 13 3.44772 13 4V5M8 9V13M12 9V13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-                  </svg>
+              <div class="recurring-badge-container">
+                ${durationBadge}
+              </div>
+            </div>
+            <div class="recurring-footer">
+              <div class="recurring-amount ${color}">
+                ${isIncome ? '+' : '-'}${formatCurrency(r.amount)}
+              </div>
+              <div class="recurring-actions">
+                <button onclick="openEditRecurringModal(${r.id})" class="action-btn edit-btn" title="Editar">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                </button>
+                <button onclick="deleteRecurring(${r.id}, '${r.description}')" class="action-btn delete-btn" title="Deletar">
+                  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 5H17M15 5V16C15 16.5523 14.5523 17 14 17H6C5.44772 17 5 16.5523 5 16V5M7 5V4C7 3.44772 7.44772 3 8 3H12C12.5523 3 13 3.44772 13 4V5M8 9V13M12 9V13" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                 </button>
               </div>
             </div>
@@ -1885,6 +2768,230 @@
       document.getElementById('recurringForm').reset();
       selectRecurringType('receita');
       selectRecurringDuration('permanent');
+    }
+
+    async function openEditRecurringModal(recurringId) {
+      const recurring = recurringTransactions.find(r => r.id === recurringId);
+      if (!recurring) return;
+
+      // Preencher ID
+      document.getElementById('editRecurringId').value = recurring.id;
+
+      // Preencher tipo
+      selectEditRecurringType(recurring.type);
+      document.getElementById('editRecurringType').value = recurring.type;
+
+      // Preencher descrição
+      document.getElementById('editRecurringDescription').value = recurring.description || '';
+
+      // Preencher valor
+      document.getElementById('editRecurringAmount').value = recurring.amount;
+
+      // Preencher categoria
+      document.getElementById('editRecurringCategory').value = recurring.category || '';
+
+      // Preencher cartão
+      const cardMappings = JSON.parse(localStorage.getItem('recurring_card_mappings') || '{}');
+      const cardId = cardMappings[recurringId];
+
+      if (recurring.type === 'receita') {
+        document.getElementById('editRecurringCardSelectionIncome').value = cardId || '';
+      } else {
+        document.getElementById('editRecurringCardSelection').value = cardId || '';
+      }
+
+      // Preencher data de início
+      document.getElementById('editRecurringStartDate').value = recurring.start_date || new Date().toISOString().split('T')[0];
+
+      // Preencher dia do mês
+      document.getElementById('editRecurringDay').value = recurring.day_of_month;
+
+      // Preencher duração
+      const durationValue = recurring.duration_type === 'temporary' ? 'temporary' : 'permanent';
+      selectEditRecurringDuration(durationValue);
+      document.getElementById('editRecurringDuration').value = durationValue;
+
+      if (recurring.duration_months) {
+        document.getElementById('editDurationMonths').value = recurring.duration_months;
+      }
+
+      // Atualizar dropdowns
+      updateEditRecurringCardOptions();
+      updateEditRecurringCardSelectionOptions();
+      updateEditRecurringCategoryOptions();
+
+      // Abrir modal
+      document.getElementById('editRecurringModal').classList.add('active');
+    }
+
+    function closeEditRecurringModal() {
+      document.getElementById('editRecurringModal').classList.remove('active');
+      document.getElementById('editRecurringForm').reset();
+    }
+
+    function selectEditRecurringType(type) {
+      document.getElementById('editRecurringType').value = type;
+      const recebitBtn = document.getElementById('editBtnReceitaRecurring');
+      const despesaBtn = document.getElementById('editBtnDespesaRecurring');
+      const cardSection = document.getElementById('editRecurringCardSelectionSection');
+      const cardSectionIncome = document.getElementById('editRecurringCardSelectionSectionIncome');
+
+      if (type === 'receita') {
+        recebitBtn.classList.add('btn-income-selected');
+        recebitBtn.classList.remove('btn-recurring-type');
+        despesaBtn.classList.remove('btn-income-selected');
+        despesaBtn.classList.add('btn-recurring-type');
+        cardSection.style.display = 'none';
+        cardSectionIncome.style.display = 'block';
+      } else {
+        despesaBtn.classList.add('btn-income-selected');
+        despesaBtn.classList.remove('btn-recurring-type');
+        recebitBtn.classList.remove('btn-income-selected');
+        recebitBtn.classList.add('btn-recurring-type');
+        cardSection.style.display = 'block';
+        cardSectionIncome.style.display = 'none';
+      }
+
+      // Atualizar categorias quando tipo muda
+      updateEditRecurringCategoryOptions();
+    }
+
+    function selectEditRecurringDuration(type) {
+      document.getElementById('editRecurringDuration').value = type;
+      const permanentBtn = document.getElementById('editBtnPermanent');
+      const temporaryBtn = document.getElementById('editBtnTemporary');
+      const durationSection = document.getElementById('editDurationMonthsSection');
+
+      // Remove classes de ambos os botões
+      permanentBtn.classList.remove('btn-income-selected', 'btn-expense-selected');
+      temporaryBtn.classList.remove('btn-income-selected', 'btn-expense-selected');
+
+      if (type === 'temporary') {
+        temporaryBtn.classList.add('btn-income-selected');
+        durationSection.style.display = 'block';
+      } else {
+        permanentBtn.classList.add('btn-income-selected');
+        durationSection.style.display = 'none';
+      }
+    }
+
+    function handleEditRecurringDescriptionInput(e) {
+      const value = e.target.value.toLowerCase();
+      const suggestionDiv = document.getElementById('editRecurringDescriptionSuggestion');
+      
+      if (!value) {
+        suggestionDiv.classList.add('hidden');
+        return;
+      }
+
+      const allDescriptions = new Set();
+      transactions.forEach(t => allDescriptions.add(t.description));
+      recurringTransactions.forEach(r => allDescriptions.add(r.description));
+
+      const matches = Array.from(allDescriptions).filter(desc => 
+        desc.toLowerCase().startsWith(value)
+      );
+
+      if (matches.length > 0 && matches[0] !== value) {
+        document.getElementById('editRecurringSuggestionText').textContent = matches[0];
+        suggestionDiv.classList.remove('hidden');
+      } else {
+        suggestionDiv.classList.add('hidden');
+      }
+    }
+
+    function handleEditRecurringDescriptionKeydown(e) {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const suggestionDiv = document.getElementById('editRecurringDescriptionSuggestion');
+        if (!suggestionDiv.classList.contains('hidden')) {
+          acceptEditRecurringSuggestion();
+        }
+      }
+    }
+
+    function acceptEditRecurringSuggestion() {
+      const suggestionText = document.getElementById('editRecurringSuggestionText').textContent;
+      document.getElementById('editRecurringDescription').value = suggestionText;
+      document.getElementById('editRecurringDescriptionSuggestion').classList.add('hidden');
+    }
+
+    async function saveEditRecurring(e) {
+      e.preventDefault();
+
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      if (submitBtn.disabled) return;
+
+      submitBtn.disabled = true;
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = 'Salvando...';
+
+      try {
+        const recurringId = parseInt(document.getElementById('editRecurringId').value);
+        const formData = new FormData(e.target);
+        const type = formData.get('type');
+
+        const durationMonthsValue = formData.get('duration_months');
+        const durationMonths = durationMonthsValue && durationMonthsValue !== '' ? parseInt(durationMonthsValue) : null;
+
+        let cardId = null;
+        if (type === 'receita') {
+          const cardIdIncome = formData.get('card_id_income');
+          cardId = cardIdIncome && cardIdIncome !== '' ? parseInt(cardIdIncome) : null;
+        } else {
+          const cardIdExpense = formData.get('card_id');
+          cardId = cardIdExpense && cardIdExpense !== '' ? parseInt(cardIdExpense) : null;
+        }
+
+        const updateData = {
+          type: type,
+          description: formData.get('description'),
+          amount: parseFloat(formData.get('amount')),
+          category: formData.get('category'),
+          start_date: formData.get('start_date'),
+          day_of_month: parseInt(formData.get('day_of_month')),
+          duration_type: formData.get('duration_type'),
+          duration_months: durationMonths
+        };
+
+        console.log('Updating recurring transaction:', { recurringId, userId: currentUser.id, updateData });
+
+        const { error } = await supabaseClient
+          .from('recurring_transactions')
+          .update(updateData)
+          .match({ id: recurringId, user_id: currentUser.id });
+
+        if (error) {
+          console.error('Error updating recurring transaction:', error);
+          console.error('Error details:', { recurringId, currentUserId: currentUser?.id, error });
+          showToast('Erro ao atualizar transação recorrente', 'error');
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+          return;
+        }
+
+        // Atualizar card mapping em localStorage
+        if (cardId) {
+          const cardMappings = JSON.parse(localStorage.getItem('recurring_card_mappings') || '{}');
+          cardMappings[recurringId] = cardId;
+          localStorage.setItem('recurring_card_mappings', JSON.stringify(cardMappings));
+        }
+
+        showToast('Transação recorrente atualizada com sucesso!', 'success');
+
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+
+        await loadData();
+        updateUI();
+        closeEditRecurringModal();
+      } catch (error) {
+        console.error('Error saving edit recurring transaction:', error);
+        showToast('Erro ao atualizar transação recorrente. Tente novamente.', 'error');
+        
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
     }
 
     function selectRecurringType(type) {
@@ -1942,21 +3049,17 @@
       
       hiddenInput.value = durationType;
       
+      // Remove todas as classes de seleção de ambos
+      btnPermanent.classList.remove('btn-permanent-selected', 'btn-temporary-selected');
+      btnTemporary.classList.remove('btn-permanent-selected', 'btn-temporary-selected');
+      
       if (durationType === 'permanent') {
+        // Adicionar classe de seleção apenas ao permanente
         btnPermanent.classList.add('btn-permanent-selected');
-        btnPermanent.classList.remove('btn-temporary-selected');
-        
-        btnTemporary.classList.remove('btn-permanent-selected');
-        btnTemporary.classList.add('btn-temporary-selected');
-        
         monthsSection.style.display = 'none';
       } else {
-        btnTemporary.classList.add('btn-permanent-selected');
-        btnTemporary.classList.remove('btn-temporary-selected');
-        
-        btnPermanent.classList.remove('btn-permanent-selected');
-        btnPermanent.classList.add('btn-temporary-selected');
-        
+        // Adicionar classe de seleção apenas ao temporário
+        btnTemporary.classList.add('btn-temporary-selected');
         monthsSection.style.display = 'block';
       }
     }
@@ -1964,6 +3067,15 @@
     function updateRecurringCategoryOptions() {
       const select = document.getElementById('recurringCategory');
       const type = document.getElementById('recurringType').value;
+      
+      const filteredCategories = categories.filter(c => c.type === type);
+
+      select.innerHTML = filteredCategories.map(c => `<option value="${c.name}">${c.name}</option>`).join('');
+    }
+
+    function updateEditRecurringCategoryOptions() {
+      const select = document.getElementById('editRecurringCategory');
+      const type = document.getElementById('editRecurringType').value;
       
       const filteredCategories = categories.filter(c => c.type === type);
 
@@ -2024,6 +3136,39 @@
         }).join('');
     }
 
+    function updateEditRecurringCardSelectionOptions() {
+      const select = document.getElementById('editRecurringCardSelection');
+      
+      select.innerHTML = '<option value="">Selecione um cartão</option>' +
+        cards.map(c => {
+          const typeLabel = c.type === 'credito' ? '💳 Crédito' : '💳 Débito';
+          let infoLabel = '';
+          
+          if (c.type === 'credito') {
+            const used = calculateCardUsage(c.id);
+            const available = c.credit_limit - used;
+            infoLabel = ` - Disponível: ${formatCurrency(available)}`;
+          } else {
+            const balance = calculateDebitCardBalance(c.id);
+            infoLabel = ` - Saldo: ${formatCurrency(balance)}`;
+          }
+          
+          return `<option value="${c.id}">${c.name} ${typeLabel}${infoLabel}</option>`;
+        }).join('');
+    }
+
+    function updateEditRecurringCardOptions() {
+      const select = document.getElementById('editRecurringCardSelectionIncome');
+      
+      const debitCards = cards.filter(c => c.type === 'debito');
+      
+      select.innerHTML = '<option value="">Nenhum (dinheiro/outro)</option>' +
+        debitCards.map(c => {
+          const balance = calculateDebitCardBalance(c.id);
+          return `<option value="${c.id}">${c.name} 🏦 - Saldo atual: ${formatCurrency(balance)}</option>`;
+        }).join('');
+    }
+
     async function saveRecurring(e) {
       e.preventDefault();
       
@@ -2052,16 +3197,18 @@
       }
       
       const description = formData.get('description');
+      const startDateStr = formData.get('start_date');
+      const dayOfMonth = parseInt(formData.get('day_of_month'));
       
       const data = {
         type: type,
         description: description,
         amount: parseFloat(formData.get('amount')),
         category: formData.get('category'),
-        day_of_month: parseInt(formData.get('day_of_month')),
+        day_of_month: dayOfMonth,
         duration_type: formData.get('duration_type'),
         duration_months: durationMonths,
-        start_date: formData.get('start_date'),
+        start_date: startDateStr,
         is_active: true,
         user_id: currentUser.id
       };
@@ -2082,7 +3229,49 @@
           localStorage.setItem('recurring_card_mappings', JSON.stringify(cardMappings));
         }
 
-        showToast('Transação recorrente cadastrada com sucesso!', 'success');
+        // Criar uma transação REAL imediatamente no mês da data de início
+        // Independentemente do dia, vira transação real no mês de início
+        const startDate = new Date(startDateStr + 'T00:00:00');
+        const startMonth = startDate.getMonth();
+        const startYear = startDate.getFullYear();
+        
+        // Criar transação na data especificada (day_of_month) do mês de início
+        const transactionDate = new Date(startYear, startMonth, dayOfMonth);
+        
+        // Determinar payment_method baseado no cartão
+        let paymentMethod = 'dinheiro';
+        if (cardId) {
+          const card = cards.find(c => c.id === cardId);
+          if (card) {
+            paymentMethod = card.type;
+          }
+        }
+        
+        const transactionData = {
+          type: type,
+          description: description,
+          amount: parseFloat(formData.get('amount')),
+          category: formData.get('category'),
+          date: transactionDate.toISOString().split('T')[0],
+          payment_method: paymentMethod,
+          installments: 1,
+          current_installment: 1,
+          user_id: currentUser.id
+        };
+        
+        if (cardId) {
+          transactionData.card_id = cardId;
+        }
+        
+        console.log('Criando transação real para recorrente:', transactionData);
+        
+        const { error: txError } = await supabaseClient.from('transactions').insert([transactionData]);
+        if (txError) {
+          console.warn('Aviso ao criar transação inicial da recorrente:', txError);
+          // Não falha - continua mesmo sem criar a transação inicial
+        }
+
+        showToast('✅ Transação recorrente cadastrada com sucesso!', 'success');
         
         // Reabilitar botão após sucesso
         submitBtn.disabled = false;
@@ -2093,7 +3282,7 @@
         closeRecurringModal();
       } catch (error) {
         console.error('Error saving recurring transaction:', error);
-        showToast('Erro ao cadastrar transação recorrente. Verifique os dados e tente novamente.', 'error');
+        showToast('❌ Erro ao cadastrar transação recorrente. Verifique os dados e tente novamente.', 'error');
         
         // Reabilitar botão em caso de erro
         submitBtn.disabled = false;
@@ -2102,7 +3291,9 @@
     }
 
     async function deleteTransaction(transactionId, description, installments, currentInstallment) {
-      const transaction = transactions.find(t => t.id === transactionId);
+      // Converter para número se for uma string numérica
+      const numId = isNaN(transactionId) ? transactionId : parseInt(transactionId);
+      const transaction = transactions.find(t => t.id === numId);
       
       if (!transaction) {
         showToast('Transação não encontrada.', 'error');
@@ -2515,7 +3706,9 @@
 
     function openEditTransactionModal(transactionId) {
       buildDescriptionSuggestions();
-      const transaction = transactions.find(t => t.id === transactionId);
+      // Converter para número se for uma string numérica
+      const numId = isNaN(transactionId) ? transactionId : parseInt(transactionId);
+      const transaction = transactions.find(t => t.id === numId);
       
       if (!transaction) {
         showToast('Transação não encontrada.', 'error');
@@ -3350,6 +4543,102 @@
       document.getElementById('cardForm').reset();
     }
 
+    async function openEditCardModal(cardId) {
+      const card = cards.find(c => c.id === cardId);
+      if (!card) return;
+
+      document.getElementById('editCardId').value = card.id;
+      document.getElementById('editCardName').value = card.name;
+      document.getElementById('editCardType').value = card.type;
+      document.getElementById('editCardLast4').value = card.last_four || '';
+
+      if (card.type === 'credito') {
+        document.getElementById('editCardLimit').value = card.credit_limit || '';
+        document.getElementById('editClosingDay').value = card.closing_day || '';
+        document.getElementById('editDueDay').value = card.due_day || '';
+        document.getElementById('editCreditCardFields').style.display = 'block';
+      } else {
+        document.getElementById('editCreditCardFields').style.display = 'none';
+      }
+
+      document.getElementById('editCardModal').classList.add('active');
+    }
+
+    function closeEditCardModal() {
+      document.getElementById('editCardModal').classList.remove('active');
+      document.getElementById('editCardForm').reset();
+    }
+
+    function toggleEditCreditCardFields() {
+      const cardType = document.getElementById('editCardType').value;
+      const creditCardFields = document.getElementById('editCreditCardFields');
+      if (cardType === 'credito') {
+        creditCardFields.style.display = 'block';
+      } else {
+        creditCardFields.style.display = 'none';
+      }
+    }
+
+    async function saveEditCard(e) {
+      e.preventDefault();
+
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      if (submitBtn.disabled) return;
+
+      submitBtn.disabled = true;
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = 'Salvando...';
+
+      try {
+        const cardId = parseInt(document.getElementById('editCardId').value);
+        const formData = new FormData(e.target);
+        const cardType = formData.get('type');
+
+        const updateData = {
+          name: formData.get('name'),
+          type: cardType,
+          last_four: formData.get('last_four') || null
+        };
+
+        if (cardType === 'credito') {
+          updateData.credit_limit = parseFloat(formData.get('credit_limit')) || null;
+          updateData.closing_day = parseInt(formData.get('closing_day')) || null;
+          updateData.due_day = parseInt(formData.get('due_day')) || null;
+        }
+
+        console.log('Updating card:', { cardId, userId: currentUser.id, updateData });
+
+        const { error } = await supabaseClient
+          .from('cards')
+          .update(updateData)
+          .match({ id: cardId, user_id: currentUser.id });
+
+        if (error) {
+          console.error('Error updating card:', error);
+          console.error('Error details:', { cardId, currentUserId: currentUser?.id, error });
+          showToast('Erro ao atualizar cartão', 'error');
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+          return;
+        }
+
+        showToast('Cartão atualizado com sucesso!', 'success');
+
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+
+        await loadData();
+        updateUI();
+        closeEditCardModal();
+      } catch (error) {
+        console.error('Error saving edit card:', error);
+        showToast('Erro ao atualizar cartão. Tente novamente.', 'error');
+
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
+    }
+
     function toggleCreditCardFields() {
       const cardType = document.getElementById('cardType').value;
       const creditCardFields = document.getElementById('creditCardFields');
@@ -3461,9 +4750,11 @@
       submitBtn.textContent = 'Salvando...';
       
       const formData = new FormData(e.target);
+      const cardType = formData.get('type');
+      
       const data = {
         name: formData.get('name'),
-        type: formData.get('type'),
+        type: cardType,
         last_four: formData.get('last_four'),
         credit_limit: formData.get('credit_limit') ? parseFloat(formData.get('credit_limit')) : null,
         closing_day: formData.get('closing_day') ? parseInt(formData.get('closing_day')) : null,
@@ -3472,7 +4763,7 @@
       };
 
       try {
-        const { error } = await supabaseClient.from('cards').insert([data]);
+        const { data: insertedData, error } = await supabaseClient.from('cards').insert([data]).select();
         
         if (error) throw error;
 
@@ -3505,6 +4796,126 @@
       }
     }
 
+    function openAddInitialInvoiceModal(cardId, cardName) {
+      const confirmDiv = document.createElement('div');
+      confirmDiv.className = 'modal active';
+      confirmDiv.innerHTML = `
+        <div class="modal-content max-w-2xl">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-2xl font-bold text-blue-500">➕ Adicionar Fatura ao ${cardName}</h3>
+            <button onclick="this.closest('.modal').remove()" class="text-gray-400 hover:text-white text-2xl font-bold">✕</button>
+          </div>
+
+          <form onsubmit="saveInitialInvoice(event, ${cardId})" class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold mb-2">Descrição</label>
+              <input type="text" name="description" placeholder="Ex: Fatura de dezembro" required class="w-full" />
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold mb-2">Valor</label>
+                <input type="number" name="amount" placeholder="0,00" step="0.01" required class="w-full" />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold mb-2">Data</label>
+                <input type="date" name="date" required class="w-full" />
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold mb-2">Parcelas</label>
+                <input type="number" name="installments" value="1" min="1" class="w-full" />
+              </div>
+              <div>
+                <label class="block text-sm font-semibold mb-2">Parcela Atual</label>
+                <input type="number" name="current_installment" value="1" min="1" class="w-full" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-semibold mb-2">Categoria</label>
+              <select name="category" required class="w-full">
+                <option value="">Selecione uma categoria</option>
+                ${categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
+              </select>
+            </div>
+
+            <div class="flex gap-3 pt-4">
+              <button type="submit" class="btn-primary flex-1">✅ Adicionar Fatura</button>
+              <button type="button" class="btn-secondary flex-1" onclick="this.closest('.modal').remove()">Cancelar</button>
+            </div>
+          </form>
+
+          <div class="mt-6 p-4 bg-blue-500 bg-opacity-10 border border-blue-500 rounded-lg">
+            <p class="text-sm text-blue-300">💡 <strong>Dica:</strong> Você pode adicionar múltiplas faturas clicando novamente no botão "Adicionar Faturas" após salvar cada uma.</p>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(confirmDiv);
+    }
+
+    async function saveInitialInvoice(e, cardId) {
+      e.preventDefault();
+
+      const formData = new FormData(e.target);
+      
+      const data = {
+        type: 'despesa',
+        description: formData.get('description'),
+        amount: parseFloat(formData.get('amount')),
+        category: formData.get('category'),
+        date: formData.get('date'),
+        payment_method: 'credito',
+        card_id: cardId,
+        installments: parseInt(formData.get('installments')) || 1,
+        current_installment: parseInt(formData.get('current_installment')) || 1,
+        user_id: currentUser.id
+      };
+
+      try {
+        console.log('Salvando fatura inicial:', data);
+
+        const { error } = await supabaseClient.from('transactions').insert([data]);
+        
+        if (error) throw error;
+
+        showToast(`✅ Fatura de ${formatCurrency(data.amount)} adicionada com sucesso!`, 'success');
+        
+        // Recarregar dados
+        await loadData();
+        updateUI();
+        
+        // Fechar o modal
+        const modal = document.querySelector('.modal.active');
+        if (modal) modal.remove();
+        
+        // Perguntar se quer adicionar outra
+        const card = cards.find(c => c.id === cardId);
+        const cardName = card ? card.name : 'Cartão';
+        
+        const confirmDiv = document.createElement('div');
+        confirmDiv.className = 'modal active';
+        confirmDiv.innerHTML = `
+          <div class="modal-content max-w-md">
+            <h3 class="text-xl font-bold mb-4 text-green-500">✅ Fatura Adicionada!</h3>
+            <p class="text-gray-400 mb-6">Deseja adicionar outra fatura para <strong>${cardName}</strong>?</p>
+            
+            <div class="flex gap-3">
+              <button class="btn-primary flex-1" onclick="openAddInitialInvoiceModal(${cardId}, '${cardName}'); this.closest('.modal').remove();">Adicionar Outra</button>
+              <button class="btn-secondary flex-1" onclick="this.closest('.modal').remove();">Finalizar</button>
+            </div>
+          </div>
+        `;
+        document.body.appendChild(confirmDiv);
+        
+      } catch (error) {
+        console.error('Error saving initial invoice:', error);
+        showToast(`❌ Erro ao adicionar fatura: ${error.message}`, 'error');
+      }
+    }
+
     function openGoalModal() {
       document.getElementById('goalModal').classList.add('active');
     }
@@ -3512,6 +4923,89 @@
     function closeGoalModal() {
       document.getElementById('goalModal').classList.remove('active');
       document.getElementById('goalForm').reset();
+    }
+
+    async function openEditGoalModal(goalId) {
+      const goal = goals.find(g => g.id === goalId);
+      if (!goal) return;
+
+      // Mapear número de prioridade de volta para texto
+      const priorityNumToText = { 1: 'baixa', 2: 'media', 3: 'alta' };
+      const priorityText = priorityNumToText[goal.priority] || 'media';
+
+      document.getElementById('editGoalId').value = goal.id;
+      document.getElementById('editGoalName').value = goal.name;
+      document.getElementById('editGoalDescription').value = goal.description || '';
+      document.getElementById('editGoalTarget').value = goal.target_amount;
+      document.getElementById('editGoalCurrent').value = goal.current_amount;
+      document.getElementById('editGoalDeadline').value = goal.deadline || '';
+      document.getElementById('editGoalPriority').value = priorityText;
+
+      document.getElementById('editGoalModal').classList.add('active');
+    }
+
+    function closeEditGoalModal() {
+      document.getElementById('editGoalModal').classList.remove('active');
+      document.getElementById('editGoalForm').reset();
+    }
+
+    async function saveEditGoal(e) {
+      e.preventDefault();
+
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      if (submitBtn.disabled) return;
+
+      submitBtn.disabled = true;
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = 'Salvando...';
+
+      try {
+        const goalId = parseInt(document.getElementById('editGoalId').value);
+        const formData = new FormData(e.target);
+
+        // Mapear prioridade de texto para número
+        const priorityMap = { 'baixa': 1, 'media': 2, 'alta': 3 };
+        const priorityValue = formData.get('priority') || 'media';
+
+        const updateData = {
+          name: formData.get('name'),
+          target_amount: parseFloat(formData.get('target_amount')),
+          current_amount: parseFloat(formData.get('current_amount')),
+          deadline: formData.get('deadline') || null,
+          priority: priorityMap[priorityValue] || 2
+        };
+
+        console.log('Updating goal:', { goalId, userId: currentUser.id, updateData });
+
+        const { error } = await supabaseClient
+          .from('goals')
+          .update(updateData)
+          .match({ id: goalId, user_id: currentUser.id });
+
+        if (error) {
+          console.error('Error updating goal:', error);
+          console.error('Error details:', { goalId, currentUserId: currentUser?.id, error });
+          showToast('Erro ao atualizar meta', 'error');
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+          return;
+        }
+
+        showToast('Meta atualizada com sucesso!', 'success');
+
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+
+        await loadData();
+        updateUI();
+        closeEditGoalModal();
+      } catch (error) {
+        console.error('Error saving edit goal:', error);
+        showToast('Erro ao atualizar meta. Tente novamente.', 'error');
+
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      }
     }
 
     async function saveGoal(e) {
@@ -3526,12 +5020,19 @@
       submitBtn.textContent = 'Salvando...';
       
       const formData = new FormData(e.target);
+      
+      // Mapear prioridade de texto para número
+      const priorityMap = { 'baixa': 1, 'media': 2, 'alta': 3 };
+      const priorityValue = formData.get('priority') || 'media';
+      
       const data = {
         name: formData.get('name'),
         target_amount: parseFloat(formData.get('target_amount')),
         current_amount: parseFloat(formData.get('current_amount')) || 0,
         deadline: formData.get('deadline') || null,
-        user_id: currentUser.id
+        priority: priorityMap[priorityValue] || 2,
+        user_id: currentUser.id,
+        created_at: new Date().toISOString()
       };
 
       try {
@@ -3835,10 +5336,39 @@
       const newBalance = parseFloat(document.getElementById('adjustBalanceInput').value);
       
       try {
-        // Armazenar o ajuste manual no localStorage
-        const adjustments = JSON.parse(localStorage.getItem('manualBalanceAdjustments') || '{}');
-        adjustments[currentUser.id] = newBalance;
-        localStorage.setItem('manualBalanceAdjustments', JSON.stringify(adjustments));
+        // Calcular saldo atual sem ajustes
+        const currentCalculatedBalance = calculateRealBalance();
+        const difference = newBalance - currentCalculatedBalance;
+        
+        console.log('Saldo calculado:', currentCalculatedBalance);
+        console.log('Novo saldo desejado:', newBalance);
+        console.log('Diferença:', difference);
+        
+        // Se há diferença, criar transação de ajuste
+        if (Math.abs(difference) > 0.01) {
+          const adjustmentTransaction = {
+            user_id: currentUser.id,
+            type: 'ajuste',
+            description: `Ajuste de saldo: ${difference > 0 ? '+' : ''}${formatCurrency(difference)}`,
+            amount: Math.abs(difference),
+            category: 'Ajuste',
+            date: new Date().toISOString().split('T')[0],
+            payment_method: 'ajuste',
+            installments: 1,
+            current_installment: 1
+          };
+          
+          console.log('Criando transação de ajuste:', adjustmentTransaction);
+          
+          const { data, error: insertError } = await supabaseClient.from('transactions').insert([adjustmentTransaction]).select();
+          
+          if (insertError) {
+            console.error('Erro ao inserir ajuste:', insertError);
+            throw insertError;
+          }
+          
+          console.log('Transação de ajuste criada:', data);
+        }
         
         showToast(`Saldo ajustado para ${formatCurrency(newBalance)}`, 'success');
         
@@ -3846,6 +5376,11 @@
         submitBtn.textContent = 'Confirmar';
         
         closeAdjustBalanceModal();
+        currentViewDate = new Date();
+        
+        // Processar recorrências pendentes
+        await processRecurringTransactions();
+        
         await loadData();
         updateUI();
       } catch (error) {
@@ -3853,7 +5388,133 @@
         showToast('Erro ao ajustar saldo. Tente novamente.', 'error');
         
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Confirmar';
+        submitBtn.textContent = originalText;
+      }
+    }
+
+    // Calcular saldo baseado apenas em transações reais
+    function calculateRealBalance() {
+      const incomeTotal = transactions
+        .filter(t => t.type === 'receita')
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      
+      // Despesas que afetam saldo (não-crédito)
+      const expenseTotal = transactions
+        .filter(t => t.type === 'despesa' && t.payment_method !== 'credito')
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      
+      // Ajustes
+      const adjustmentTotal = transactions
+        .filter(t => t.type === 'ajuste')
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      
+      return incomeTotal - expenseTotal + adjustmentTotal;
+    }
+
+    // Processar recorrências e gerar transações reais
+    async function processRecurringTransactions() {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      for (const recurring of recurringTransactions) {
+        const startDate = new Date(recurring.start_date + 'T00:00:00');
+        startDate.setHours(0, 0, 0, 0);
+        
+        // Não processar se ainda não começou
+        if (startDate > today) continue;
+        
+        // Verificar duração se for temporária
+        if (recurring.duration_type === 'temporary' && recurring.duration_months) {
+          const expirationDate = new Date(startDate);
+          expirationDate.setMonth(expirationDate.getMonth() + recurring.duration_months);
+          if (today >= expirationDate) continue;
+        }
+        
+        // Determinar ponto de partida
+        let currentMonth, currentYear;
+        
+        if (recurring.last_generated_month !== null && recurring.last_generated_month !== undefined) {
+          // Já foi processada antes, continuar do próximo mês
+          currentMonth = recurring.last_generated_month;
+          currentYear = recurring.last_generated_year;
+          
+          // Avançar para próximo mês
+          currentMonth = (currentMonth + 1) % 12;
+          if (currentMonth === 0) currentYear++;
+        } else {
+          // Primeira vez, começar do mês da data de início
+          currentMonth = startDate.getMonth();
+          currentYear = startDate.getFullYear();
+        }
+        
+        // Processar até hoje
+        while (new Date(currentYear, currentMonth, recurring.day_of_month) <= today) {
+          const transactionDate = new Date(currentYear, currentMonth, recurring.day_of_month);
+          
+          // Só processar se a data de início já passou
+          if (transactionDate < startDate) {
+            // Avançar para próximo mês
+            currentMonth = (currentMonth + 1) % 12;
+            if (currentMonth === 0) currentYear++;
+            continue;
+          }
+          
+          const dateString = transactionDate.toISOString().split('T')[0];
+          
+          // Verificar se já existe transação desta recorrência neste mês
+          const { data: existingInstances } = await supabaseClient
+            .from('recurring_instances')
+            .select('id')
+            .match({
+              user_id: currentUser.id,
+              recurring_id: recurring.id,
+              month: currentMonth,
+              year: currentYear
+            });
+          
+          if (!existingInstances || existingInstances.length === 0) {
+            // Criar transação real
+            const newTransaction = {
+              user_id: currentUser.id,
+              type: recurring.type,
+              description: recurring.description,
+              amount: parseFloat(recurring.amount),
+              category: recurring.category,
+              date: dateString,
+              payment_method: recurring.payment_method || 'dinheiro',
+              installments: 1,
+              current_installment: 1
+            };
+            
+            const { data: transactionData, error: transError } = await supabaseClient
+              .from('transactions')
+              .insert([newTransaction])
+              .select();
+            
+            if (!transError && transactionData && transactionData.length > 0) {
+              // Registrar instância de recorrência
+              await supabaseClient.from('recurring_instances').insert([{
+                user_id: currentUser.id,
+                recurring_id: recurring.id,
+                transaction_id: transactionData[0].id,
+                month: currentMonth,
+                year: currentYear
+              }]);
+              
+              // Atualizar último mês processado
+              await supabaseClient.from('recurring_transactions')
+                .update({
+                  last_generated_month: currentMonth,
+                  last_generated_year: currentYear
+                })
+                .eq('id', recurring.id);
+            }
+          }
+          
+          // Próximo mês
+          currentMonth = (currentMonth + 1) % 12;
+          if (currentMonth === 0) currentYear++;
+        }
       }
     }
 
@@ -3868,15 +5529,42 @@
       submitBtn.textContent = 'Salvando...';
       
       const formData = new FormData(e.target);
+      const categoryName = formData.get('name');
+      const categoryType = formData.get('type');
+      
+      // Verificar se categoria já existe
+      const existingCategory = categories.find(c => 
+        c.name.toLowerCase() === categoryName.toLowerCase() && 
+        c.type === categoryType
+      );
+      
+      if (existingCategory) {
+        showToast('Essa categoria já existe!', 'warning');
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        return;
+      }
+      
       const data = {
-        name: formData.get('name'),
-        type: formData.get('type')
+        name: categoryName,
+        type: categoryType,
+        user_id: currentUser.id
       };
 
       try {
         const { error } = await supabaseClient.from('categories').insert([data]);
         
-        if (error) throw error;
+        if (error) {
+          // Verificar se é erro de duplicata
+          if (error.code === '23505' || error.message?.includes('duplicate')) {
+            showToast('Essa categoria já existe! Tente um nome diferente.', 'warning');
+          } else {
+            throw error;
+          }
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+          return;
+        }
 
         showToast('Categoria cadastrada com sucesso!', 'success');
         
@@ -3899,7 +5587,7 @@
         }
       } catch (error) {
         console.error('Error saving category:', error);
-        showToast('Erro ao cadastrar categoria. Tente novamente.', 'error');
+        showToast(`Erro ao cadastrar categoria: ${error.message || 'Tente novamente.'}`, 'error');
         
         // Reabilitar botão em caso de erro
         submitBtn.disabled = false;
@@ -3942,47 +5630,14 @@
       }
     }
 
-    function confirmDeleteAllData() {
-      const confirmDiv = document.createElement('div');
-      confirmDiv.className = 'modal active';
-      confirmDiv.innerHTML = `
-        <div class="modal-content max-w-md">
-          <h3 class="text-xl font-bold mb-4 text-red-500">⚠️ ATENÇÃO: Ação Irreversível</h3>
-          <p class="text-gray-400 mb-6">Tem CERTEZA ABSOLUTA que deseja excluir TODOS os dados? Isso incluirá:<br><br>
-          • Todas as transações<br>
-          • Todos os cartões<br>
-          • Todas as metas<br>
-          • Todas as categorias personalizadas<br>
-          • Todas as transações recorrentes<br><br>
-          <strong class="text-red-400">Esta ação NÃO PODE ser desfeita!</strong></p>
-          <div class="flex gap-3">
-            <button class="btn-primary" style="background: #ef4444;" onclick="executeDeleteAllData()">Sim, excluir TUDO</button>
-            <button class="btn-secondary" onclick="this.closest('.modal').remove()">Cancelar</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(confirmDiv);
-    }
-
     async function executeDeleteAllData() {
       try {
-        await supabaseClient.from('transactions').delete().neq('id', 0);
-        await supabaseClient.from('cards').delete().neq('id', 0);
-        await supabaseClient.from('goals').delete().neq('id', 0);
-        await supabaseClient.from('categories').delete().neq('id', 0);
-        await supabaseClient.from('recurring_transactions').delete().neq('id', 0);
-
-        // Redefinir categorias padrão
-        const defaultCategories = [
-          { name: 'Salário', type: 'receita' },
-          { name: 'Freelance', type: 'receita' },
-          { name: 'Investimento', type: 'receita' },
-          { name: 'Alimentação', type: 'despesa' },
-          { name: 'Transporte', type: 'despesa' },
-          { name: 'Moradia', type: 'despesa' }
-        ];
-
-        await supabaseClient.from('categories').insert(defaultCategories);
+        // Deletar apenas dados do usuário logado
+        await supabaseClient.from('transactions').delete().match({ user_id: currentUser.id });
+        await supabaseClient.from('cards').delete().match({ user_id: currentUser.id });
+        await supabaseClient.from('goals').delete().match({ user_id: currentUser.id });
+        await supabaseClient.from('categories').delete().match({ user_id: currentUser.id });
+        await supabaseClient.from('recurring_transactions').delete().match({ user_id: currentUser.id });
 
         // Redefinir estatísticas do usuário
         userStats = {
@@ -3992,7 +5647,13 @@
         };
 
         showToast('Sistema redefinido para o padrão inicial!', 'success');
-        document.querySelector('.modal.active').remove();
+        
+        // Remover modal com segurança
+        const modalElement = document.querySelector('.modal.active');
+        if (modalElement) {
+          modalElement.remove();
+        }
+        
         await loadData();
         updateUI();
       } catch (error) {
@@ -4001,7 +5662,109 @@
       }
     }
 
-    async function payCardInvoice(cardId, amount, period) {
+    function openAdjustInvoiceModal(cardId, currentAmount, cardName) {
+      const confirmDiv = document.createElement('div');
+      confirmDiv.className = 'modal active';
+      confirmDiv.innerHTML = `
+        <div class="modal-content max-w-md">
+          <h3 class="text-xl font-bold mb-4 text-yellow-500">📝 Ajustar Fatura - ${cardName}</h3>
+          
+          <div class="bg-gray-800 bg-opacity-50 p-4 rounded-lg mb-4">
+            <p class="text-xs text-gray-400 mb-2">Valor Atual</p>
+            <p class="text-2xl font-bold text-yellow-400">${formatCurrency(currentAmount)}</p>
+          </div>
+
+          <form onsubmit="saveAdjustInvoice(event, ${cardId}, ${currentAmount})" class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold mb-2">Novo Valor</label>
+              <input type="number" id="adjustedAmount" name="amount" placeholder="0,00" step="0.01" value="${currentAmount}" required class="w-full" />
+            </div>
+
+            <div class="text-sm text-gray-400 p-3 bg-gray-900 rounded-lg">
+              <p class="mb-2">💡 Diferença: <span id="difference" class="font-bold text-yellow-400">${formatCurrency(0)}</span></p>
+              <small>Se aumentar: será adicionado à fatura<br/>Se diminuir: será removido da fatura</small>
+            </div>
+
+            <div class="flex gap-3 pt-4">
+              <button type="submit" class="btn-primary flex-1">✅ Salvar</button>
+              <button type="button" class="btn-secondary flex-1" onclick="this.closest('.modal').remove()">Cancelar</button>
+            </div>
+          </form>
+        </div>
+      `;
+      document.body.appendChild(confirmDiv);
+
+      // Atualizar diferença em tempo real
+      const input = confirmDiv.querySelector('#adjustedAmount');
+      const diffEl = confirmDiv.querySelector('#difference');
+      
+      input.addEventListener('input', (e) => {
+        const newAmount = parseFloat(e.target.value) || 0;
+        const diff = newAmount - currentAmount;
+        diffEl.textContent = formatCurrency(Math.abs(diff));
+        diffEl.className = diff > 0 ? 'font-bold text-red-400' : diff < 0 ? 'font-bold text-green-400' : 'font-bold text-yellow-400';
+      });
+    }
+
+    async function saveAdjustInvoice(e, cardId, currentAmount) {
+      e.preventDefault();
+
+      const newAmount = parseFloat(document.getElementById('adjustedAmount').value) || 0;
+      const difference = newAmount - currentAmount;
+
+      if (difference === 0) {
+        showToast('⚠️ Nenhuma alteração no valor da fatura', 'error');
+        return;
+      }
+
+      const card = cards.find(c => c.id === cardId);
+      if (!card) {
+        showToast('❌ Cartão não encontrado', 'error');
+        return;
+      }
+
+      const now = new Date();
+
+      try {
+        // Criar transação de ajuste da fatura
+        const adjustmentData = {
+          type: 'despesa',
+          description: difference > 0 
+            ? `Ajuste Fatura ${card.name} (+${formatCurrency(difference)})`
+            : `Ajuste Fatura ${card.name} (${formatCurrency(difference)})`,
+          amount: Math.abs(difference),
+          category: 'Contas',
+          date: now.toISOString().split('T')[0],
+          payment_method: difference > 0 ? 'credito' : 'ajuste',
+          card_id: difference > 0 ? cardId : null,
+          installments: 1,
+          current_installment: 1,
+          user_id: currentUser.id
+        };
+
+        console.log('Salvando ajuste de fatura:', adjustmentData);
+
+        const { error } = await supabaseClient.from('transactions').insert([adjustmentData]);
+        
+        if (error) throw error;
+
+        showToast(`✅ Fatura ajustada para ${formatCurrency(newAmount)}`, 'success');
+        
+        // Fechar modal
+        const modal = document.querySelector('.modal.active');
+        if (modal) modal.remove();
+        
+        // Recarregar dados
+        await loadData();
+        updateUI();
+        
+      } catch (error) {
+        console.error('Error adjusting invoice:', error);
+        showToast(`❌ Erro ao ajustar fatura: ${error.message}`, 'error');
+      }
+    }
+
+    function payCardInvoice(cardId, amount, period) {
       const card = cards.find(c => c.id === cardId);
       const debitCards = cards.filter(c => c.type === 'debito');
       
@@ -4101,26 +5864,15 @@
         const paymentSourceCardId = paymentSourceSelect.value ? parseInt(paymentSourceSelect.value) : null;
         
         const card = cards.find(c => c.id === cardId);
+        if (!card) {
+          showToast('❌ Cartão não encontrado!', 'error');
+          return;
+        }
+
         const now = new Date();
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
         
-        // Buscar todas as transações da fatura atual (mês atual)
-        const invoiceTransactions = transactions.filter(t => {
-          if (t.card_id !== cardId || t.type !== 'despesa' || t.payment_method !== 'credito') {
-            return false;
-          }
-          
-          const tDate = new Date(t.date + 'T00:00:00');
-          return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
-        });
-
-        // Adicionar recorrentes projetadas do mês atual
-        const projectedRecurrings = getProjectedRecurringTransactions(currentMonth, currentYear);
-        const recurringInvoiceTransactions = projectedRecurrings.filter(t => 
-          t.card_id === cardId && t.type === 'despesa' && t.payment_method === 'credito'
-        );
-
         // Registrar pagamento da fatura como RECEITA negativa (débito)
         // Isso vai reduzir o saldo da conta de débito, sem deletar as transações de crédito
         const data = {
@@ -4129,25 +5881,44 @@
           amount: amount,
           category: 'Contas',
           date: now.toISOString().split('T')[0],
-          payment_method: 'pagamento_fatura',
-          card_id: paymentSourceCardId,
+          payment_method: paymentSourceCardId ? 'debito' : 'dinheiro',
           installments: 1,
-          current_installment: 1
+          current_installment: 1,
+          user_id: currentUser.id
         };
 
-        const { error } = await supabaseClient.from('transactions').insert([data]);
-        if (error) throw error;
+        // Adicionar card_id apenas se foi selecionado um cartão de débito
+        if (paymentSourceCardId) {
+          data.card_id = paymentSourceCardId;
+        }
 
-        // NÃO deletar as transações de crédito - elas devem permanecer para histórico
-        // A recurrente permanente do mês que vem vai ser considerada naturalmente no próximo mês
+        console.log('Enviando pagamento de fatura:', data);
+
+        const { data: insertedData, error } = await supabaseClient.from('transactions').insert([data]).select();
         
-        showToast(`Pagamento de ${formatCurrency(amount)} registrado com sucesso!`, 'success');
-        document.querySelector('.modal.active').remove();
+        if (error) {
+          console.error('Erro ao inserir transação:', error);
+          throw error;
+        }
+
+        console.log('Transação inserida com sucesso:', insertedData);
+        
+        showToast(`✅ Pagamento de ${formatCurrency(amount)} registrado com sucesso!`, 'success');
+        
+        // Fechar modal
+        const modal = document.querySelector('.modal.active');
+        if (modal) modal.remove();
+        
+        // Recarregar dados
+        console.log('Recarregando dados...');
         await loadData();
+        console.log('Dados recarregados. Atualizando UI...');
         updateUI();
+        console.log('UI atualizada.');
+        
       } catch (error) {
         console.error('Error paying invoice:', error);
-        showToast('Erro ao registrar pagamento. Tente novamente.', 'error');
+        showToast(`❌ Erro ao registrar pagamento: ${error.message}`, 'error');
       }
     }
 
@@ -4391,13 +6162,13 @@
     function applyLightTheme() {
       // Body e background - Pure white
       document.body.style.background = '#ffffff';
-      document.body.style.color = '#2c3e50';
+      document.body.style.color = '#1f2937';
 
-      // Sidebar - Soft blue-gray
+      // Sidebar - Clean light gray with blue accent
       const sidebar = document.querySelector('.sidebar');
       if (sidebar) {
-        sidebar.style.background = '#f5f7fa';
-        sidebar.style.borderRight = '1px solid #d5dce0';
+        sidebar.style.background = '#f9fafb';
+        sidebar.style.borderRight = '2px solid #e5e7eb';
       }
 
       // Main content - Pure white
@@ -4411,126 +6182,159 @@
         page.style.background = '#ffffff';
       });
 
-      // Month selector (roleta) - Clean light background
+      // Month selector (roleta) - Light gray with blue accent
       document.querySelectorAll('.month-selector').forEach(el => {
-        el.style.background = '#f5f7fa';
-        el.style.borderColor = '#d5dce0';
-        el.style.color = '#2c3e50';
+        el.style.background = '#f3f4f6';
+        el.style.borderColor = '#d1d5db';
+        el.style.color = '#1f2937';
       });
 
-      // Month label text - Blue
+      // Month label text - Vibrant blue
       document.querySelectorAll('.month-label').forEach(label => {
-        label.style.color = '#3b82f6';
+        label.style.color = '#2563eb';
+        label.style.fontWeight = '600';
       });
 
-      // Stat cards - Light background with subtle borders
+      // Stat cards - Light background with subtle shadow
       document.querySelectorAll('.stat-card').forEach(card => {
-        card.style.background = '#f9fbfc';
-        card.style.borderColor = '#d5dce0';
-        card.style.color = '#2c3e50';
-        card.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.05)';
+        card.style.background = '#f9fafb';
+        card.style.borderColor = '#e5e7eb';
+        card.style.color = '#1f2937';
+        card.style.boxShadow = '0 1px 2px rgba(0, 0, 0, 0.05)';
+        card.style.borderWidth = '1px';
+      });
+
+      // Stat card headings - DARK TEXT
+      document.querySelectorAll('.stat-card h3, .stat-card h4').forEach(heading => {
+        heading.style.color = '#111827';
+        heading.style.fontWeight = '700';
+      });
+
+      // Stat card text - DARK TEXT
+      document.querySelectorAll('.stat-card p, .stat-card span').forEach(text => {
+        text.style.color = '#374151';
       });
 
       // Chart containers
       document.querySelectorAll('.chart-container').forEach(container => {
-        container.style.background = '#f9fbfc';
-        container.style.borderColor = '#d5dce0';
-        container.style.color = '#2c3e50';
+        container.style.background = '#f9fafb';
+        container.style.borderColor = '#e5e7eb';
+        container.style.color = '#1f2937';
+      });
+
+      // Chart text - DARK TEXT
+      document.querySelectorAll('.chart-container span, .chart-container p').forEach(text => {
+        text.style.color = '#374151';
       });
 
       // Transaction items
       document.querySelectorAll('.transaction-item').forEach(item => {
-        item.style.background = '#f9fbfc';
-        item.style.borderColor = '#d5dce0';
-        item.style.color = '#2c3e50';
+        item.style.background = '#f9fafb';
+        item.style.borderColor = '#e5e7eb';
+        item.style.color = '#1f2937';
       });
 
-      // Projected transaction items
+      // Transaction item text - DARK TEXT
+      document.querySelectorAll('.transaction-item span, .transaction-item p').forEach(text => {
+        text.style.color = '#374151';
+      });
+
+      // Projected transaction items - Light blue tint
       document.querySelectorAll('.transaction-item.projected').forEach(item => {
-        item.style.background = '#eff3f8';
+        item.style.background = '#eff6ff';
         item.style.borderColor = '#bfdbfe';
+        item.style.color = '#1f2937';
       });
 
-      // Inputs - Clean white with light border
+      // Inputs - Clean white with gray border
       document.querySelectorAll('input, select, textarea').forEach(input => {
         input.style.background = '#ffffff';
-        input.style.borderColor = '#d5dce0';
-        input.style.color = '#2c3e50';
-        input.style.transition = 'border-color 0.3s ease';
+        input.style.borderColor = '#d1d5db';
+        input.style.color = '#1f2937';
+        input.style.transition = 'all 0.3s ease';
+        input.style.borderWidth = '1px';
       });
 
-      // Input focus states
+      // Input focus states - Blue highlight
       document.querySelectorAll('input, select, textarea').forEach(input => {
         input.onfocus = function() {
-          this.style.borderColor = '#3b82f6';
-          this.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+          this.style.borderColor = '#2563eb';
+          this.style.boxShadow = '0 0 0 3px rgba(37, 99, 235, 0.1)';
+          this.style.background = '#ffffff';
         };
         input.onblur = function() {
-          this.style.borderColor = '#d5dce0';
+          this.style.borderColor = '#d1d5db';
           this.style.boxShadow = 'none';
         };
       });
 
-      // Modal - White background with shadow
+      // Modal - White background with professional shadow
       document.querySelectorAll('.modal-content').forEach(modal => {
         modal.style.background = '#ffffff';
-        modal.style.color = '#2c3e50';
-        modal.style.boxShadow = '0 10px 40px rgba(0, 0, 0, 0.08)';
+        modal.style.color = '#1f2937';
+        modal.style.boxShadow = '0 20px 25px rgba(0, 0, 0, 0.1), 0 10px 10px rgba(0, 0, 0, 0.04)';
+        modal.style.borderRadius = '12px';
       });
 
-      // Modal backdrop
+      // Modal backdrop - Subtle dark overlay
       document.querySelectorAll('.modal').forEach(modalBg => {
-        modalBg.style.background = 'rgba(0, 0, 0, 0.3)';
+        modalBg.style.background = 'rgba(0, 0, 0, 0.25)';
       });
 
-      // Progress bar - Light blue
+      // Progress bar - Light gray background, blue fill
       document.querySelectorAll('.progress-bar').forEach(bar => {
-        bar.style.background = '#eef1f6';
+        bar.style.background = '#e5e7eb';
         const fill = bar.querySelector('.progress-fill') || bar.querySelector('div');
         if (fill) {
-          fill.style.background = 'linear-gradient(90deg, #3b82f6 0%, #0ea5e9 100%)';
+          fill.style.background = 'linear-gradient(90deg, #2563eb 0%, #0ea5e9 100%)';
         }
       });
 
-      // Primary buttons - Blue gradient
+      // Primary buttons - Bold blue gradient
       document.querySelectorAll('.btn-primary').forEach(btn => {
-        btn.style.background = 'linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)';
+        btn.style.background = 'linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%)';
         btn.style.color = '#ffffff';
         btn.style.border = 'none';
-        btn.style.boxShadow = '0 2px 8px rgba(59, 130, 246, 0.2)';
+        btn.style.boxShadow = '0 4px 6px rgba(37, 99, 235, 0.3)';
+        btn.style.fontWeight = '600';
       });
 
-      // Secondary buttons - Light background
+      // Secondary buttons - Light gray background
       document.querySelectorAll('.btn-secondary').forEach(btn => {
-        btn.style.background = '#f5f7fa';
-        btn.style.color = '#2c3e50';
-        btn.style.borderColor = '#d5dce0';
-        btn.style.border = '1px solid #d5dce0';
+        btn.style.background = '#f3f4f6';
+        btn.style.color = '#1f2937';
+        btn.style.borderColor = '#d1d5db';
+        btn.style.border = '1px solid #d1d5db';
+        btn.style.fontWeight = '500';
       });
 
       // Calculator buttons
       document.querySelectorAll('.calc-btn').forEach(btn => {
-        btn.style.background = '#f5f7fa';
-        btn.style.color = '#2c3e50';
-        btn.style.border = '1px solid #d5dce0';
+        btn.style.background = '#f3f4f6';
+        btn.style.color = '#1f2937';
+        btn.style.border = '1px solid #d1d5db';
+        btn.style.fontWeight = '500';
       });
 
       document.querySelectorAll('.calc-btn-operator').forEach(btn => {
-        btn.style.background = '#eff3f8';
-        btn.style.color = '#3b82f6';
+        btn.style.background = '#eff6ff';
+        btn.style.color = '#2563eb';
         btn.style.border = '1px solid #bfdbfe';
+        btn.style.fontWeight = '600';
       });
 
       document.querySelectorAll('.calc-btn-clear').forEach(btn => {
         btn.style.background = '#fef2f2';
         btn.style.color = '#dc2626';
         btn.style.border = '1px solid #fecaca';
+        btn.style.fontWeight = '600';
       });
 
       document.querySelectorAll('.calc-btn-equals, .calc-btn-send').forEach(btn => {
-        btn.style.background = 'linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)';
+        btn.style.background = 'linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%)';
         btn.style.color = '#ffffff';
         btn.style.border = 'none';
+        btn.style.fontWeight = '600';
       });
 
       // Danger buttons - Light red
@@ -4540,6 +6344,7 @@
           btn.style.color = '#dc2626';
           btn.style.borderColor = '#fecaca';
           btn.style.border = '1px solid #fecaca';
+          btn.style.fontWeight = '600';
         }
       });
 
@@ -4548,104 +6353,130 @@
         if (btn.textContent.includes('Pagar') || btn.textContent.includes('Confirmar') || btn.classList.contains('btn-success')) {
           btn.style.background = '#f0fdf4';
           btn.style.color = '#16a34a';
-          btn.style.borderColor = '#bbf7d0';
-          btn.style.border = '1px solid #bbf7d0';
+          btn.style.borderColor = '#86efac';
+          btn.style.border = '1px solid #86efac';
+          btn.style.fontWeight = '600';
         }
       });
 
       // Text colors - Professional dark gray
       document.querySelectorAll('h1, h2, h3, h4, h5, h6').forEach(heading => {
-        heading.style.color = '#2c3e50';
+        heading.style.color = '#111827';
+        heading.style.fontWeight = '700';
       });
 
       // Secondary text - Medium gray
       document.querySelectorAll('.text-gray-400, .text-gray-500').forEach(text => {
-        text.style.color = '#7f8c8d';
+        text.style.color = '#6b7280';
       });
 
       // Achievement badges styling
       document.querySelectorAll('.achievement').forEach(achievement => {
-        achievement.style.background = '#f9fbfc';
-        achievement.style.borderColor = '#d5dce0';
-        achievement.style.color = '#2c3e50';
+        achievement.style.background = '#f9fafb';
+        achievement.style.borderColor = '#e5e7eb';
+        achievement.style.color = '#1f2937';
         
         const unlocked = achievement.classList.contains('unlocked');
         if (unlocked) {
-          achievement.style.borderColor = '#3b82f6';
-          achievement.style.background = 'linear-gradient(135deg, rgba(59, 130, 246, 0.05), transparent)';
+          achievement.style.borderColor = '#2563eb';
+          achievement.style.background = 'linear-gradient(135deg, rgba(37, 99, 235, 0.08), transparent)';
         }
+      });
+
+      // Achievement headings - DARK TEXT
+      document.querySelectorAll('.achievement h4, .achievement h3').forEach(heading => {
+        heading.style.color = '#111827';
+        heading.style.fontWeight = '700';
+      });
+
+      // Achievement text - DARK TEXT
+      document.querySelectorAll('.achievement p, .achievement span').forEach(text => {
+        text.style.color = '#374151';
       });
 
       // Category items styling
       document.querySelectorAll('.category-item').forEach(item => {
-        item.style.background = '#f9fbfc';
-        item.style.borderColor = '#d5dce0';
-        item.style.color = '#2c3e50';
+        item.style.background = '#f9fafb';
+        item.style.borderColor = '#e5e7eb';
+        item.style.color = '#1f2937';
       });
 
-      // Achievement and category text - update colors in rendered content
-      document.querySelectorAll('.achievement h4, .category-item span').forEach(el => {
-        el.style.color = '#2c3e50';
-      });
-
-      // Achievement description text
-      document.querySelectorAll('.achievement p').forEach(p => {
-        p.style.color = '#7f8c8d';
+      // Category item text - DARK TEXT
+      document.querySelectorAll('.category-item h4, .category-item span').forEach(text => {
+        text.style.color = '#111827';
+        text.style.fontWeight = '600';
       });
 
       // Transaction type buttons - Light default
       document.querySelectorAll('.btn-transaction-type, .btn-recurring-type, .btn-duration').forEach(btn => {
-        btn.style.background = 'transparent';
-        btn.style.borderColor = '#d5dce0';
-        btn.style.color = '#7f8c8d';
+        btn.style.background = '';
+        btn.style.borderColor = '';
+        btn.style.color = '';
+        btn.style.fontWeight = '';
       });
 
       // Income/Permanent selected buttons - Blue
       document.querySelectorAll('.btn-income-selected, .btn-permanent-selected').forEach(btn => {
-        btn.style.background = 'rgba(59, 130, 246, 0.1)';
-        btn.style.borderColor = '#3b82f6';
-        btn.style.color = '#3b82f6';
+        btn.style.background = '';
+        btn.style.borderColor = '';
+        btn.style.color = '';
+        btn.style.fontWeight = '';
       });
 
       // Expense/Temporary selected buttons - Red
       document.querySelectorAll('.btn-expense-selected, .btn-temporary-selected').forEach(btn => {
-        btn.style.background = 'rgba(239, 68, 68, 0.1)';
-        btn.style.borderColor = '#ef4444';
-        btn.style.color = '#ef4444';
+        btn.style.background = '';
+        btn.style.borderColor = '';
+        btn.style.color = '';
+        btn.style.fontWeight = '';
       });
 
-      // Installment simulation box - Light blue
+      // Installment simulation box
       document.querySelectorAll('.installment-simulation-box').forEach(box => {
-        box.style.background = 'rgba(59, 130, 246, 0.05)';
-        box.style.borderColor = '#3b82f6';
+        box.style.background = 'rgba(37, 99, 235, 0.08)';
+        box.style.borderColor = '#2563eb';
       });
 
-      // Installment title - Blue
+      // Installment title
       document.querySelectorAll('.installment-title').forEach(title => {
-        title.style.color = '#3b82f6';
+        title.style.color = '#2563eb';
+        title.style.fontWeight = '700';
       });
 
-      // Installment label - Gray
+      // Installment label
       document.querySelectorAll('.installment-label').forEach(label => {
-        label.style.color = '#7f8c8d';
+        label.style.color = '#6b7280';
       });
 
-      // Installment checkbox - Blue accent
+      // Installment checkbox
       document.querySelectorAll('.installment-checkbox').forEach(checkbox => {
-        checkbox.style.accentColor = '#3b82f6';
+        checkbox.style.accentColor = '#2563eb';
       });
 
-      // Sidebar items styling
+      // Sidebar items styling - DARK TEXT for light background
       document.querySelectorAll('.sidebar-item').forEach(item => {
-        item.style.color = '#7f8c8d';
+        item.style.color = '#374151';
         item.style.borderLeftColor = 'transparent';
+        item.style.fontWeight = '500';
       });
 
-      // Credit and debit card visuals
+      // Active sidebar item - darker text
+      document.querySelectorAll('.sidebar-item.active').forEach(item => {
+        item.style.color = '#1f2937';
+        item.style.fontWeight = '700';
+        item.style.borderLeftColor = '#2563eb';
+      });
+
+      // Credit and debit card visuals - DARK TEXT
       document.querySelectorAll('.credit-card-visual, .card-visual, [class*="card-visual"]').forEach(card => {
-        card.style.background = 'linear-gradient(135deg, #ffffff 0%, #f9fbfc 100%)';
-        card.style.borderColor = '#d5dce0';
-        card.style.color = '#2c3e50';
+        card.style.background = 'linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)';
+        card.style.borderColor = '#e5e7eb';
+        card.style.color = '#111827';
+      });
+
+      // Card text labels - DARK TEXT
+      document.querySelectorAll('.credit-card-visual span, .card-visual span').forEach(span => {
+        span.style.color = '#1f2937';
       });
 
       // Tables, lists, and transaction containers
@@ -4654,47 +6485,109 @@
           const currentBg = el.style.background;
           if (currentBg && (currentBg.includes('#1a1a1a') || currentBg.includes('#0a0a0a') || currentBg.includes('dark'))) {
             el.style.background = '#ffffff';
+            el.style.color = '#1f2937';
           }
         }
       });
 
-      // SVG icons color
+      // SVG icons color - ENSURE DARK STROKES
       document.querySelectorAll('svg').forEach(svg => {
         const stroke = svg.getAttribute('stroke');
         const color = svg.getAttribute('color');
         
-        if (stroke === '#888' || stroke === '#e5e5e5' || stroke === 'currentColor') {
-          // Keep currentColor for inherited colors
-        }
-        if (!color || color === '#888' || color === '#e5e5e5') {
-          svg.setAttribute('color', '#7f8c8d');
+        // Skip if it has specific colors (green/red for income/expense)
+        if (stroke === '#10b981' || stroke === '#ef4444' || color === '#10b981' || color === '#ef4444') {
+          return;
         }
         
-        // SVG strokes in categories/achievements
-        if (stroke === '#10b981' || stroke === '#ef4444') {
-          // Keep original colors for income/expense indicators
+        // Change light colors to dark
+        if (stroke === '#888' || stroke === '#e5e5e5' || stroke === '#888888') {
+          svg.setAttribute('stroke', '#4b5563');
+        }
+        if (stroke === 'currentColor') {
+          // Keep currentColor for inherited styling
+        }
+        if (!color || color === '#888' || color === '#e5e5e5' || color === '#888888') {
+          svg.setAttribute('color', '#4b5563');
         }
       });
 
-      // Category and achievement SVG icons - update for light theme
+      // Category and achievement SVG icons - DARK COLORS
       document.querySelectorAll('.category-item svg, .achievement svg').forEach(svg => {
         const stroke = svg.getAttribute('stroke');
+        const color = svg.getAttribute('color');
+        
         if (stroke === '#10b981' || stroke === '#ef4444') {
-          // Keep original colors
-        } else if (stroke === '#888' || stroke === '#e5e5e5') {
-          svg.setAttribute('stroke', '#7f8c8d');
+          return; // Keep income/expense colors
+        }
+        if (stroke === '#888' || stroke === '#e5e5e5' || stroke === '#888888') {
+          svg.setAttribute('stroke', '#374151');
+        }
+        if (!color || color === '#888' || color === '#e5e5e5') {
+          svg.setAttribute('color', '#374151');
         }
       });
 
-      // Border colors
+      // Border colors - update dark borders to light
       document.querySelectorAll('[class*="border"]').forEach(el => {
         if (el.style && el.style.borderColor) {
           const borderColor = el.style.borderColor;
-          if (borderColor === '#2a2a2a' || borderColor === '#1a1a1a') {
-            el.style.borderColor = '#d5dce0';
+          if (borderColor === '#2a2a2a' || borderColor === '#1a1a1a' || borderColor === '#0a0a0a') {
+            el.style.borderColor = '#e5e7eb';
           }
         }
       });
+
+      // Span and small text elements - DARK TEXT
+      document.querySelectorAll('span').forEach(span => {
+        if (span.style && span.style.color === '#e5e5e5' || span.style.color === '#888888') {
+          span.style.color = '#374151';
+        }
+      });
+
+      // Badges com fundo verde/amarelo escuro - WHITE TEXT
+      document.querySelectorAll('[class*="bg-green"], [class*="bg-yellow"]').forEach(el => {
+        const classes = el.className;
+        // Se tem classe de fundo verde-900 ou amarelo-900, garante texto branco
+        if ((classes.includes('bg-green-9') || classes.includes('bg-yellow-9')) && !classes.includes('text-white')) {
+          el.style.color = '#ffffff';
+        }
+      });
+
+      // Labels - DARK TEXT
+      document.querySelectorAll('label').forEach(label => {
+        label.style.color = '#1f2937';
+        label.style.fontWeight = '500';
+      });
+
+      // Paragraphs - DARK TEXT
+      document.querySelectorAll('p').forEach(p => {
+        if (!p.style.color || p.style.color === '#e5e5e5') {
+          p.style.color = '#374151';
+        }
+      });
+
+      // Link colors - BLUE
+      document.querySelectorAll('a').forEach(link => {
+        link.style.color = '#2563eb';
+      });
+
+      // Income and expenses colors - always green and red
+      const monthIncomeEl = document.getElementById('monthIncome');
+      if (monthIncomeEl) {
+        monthIncomeEl.style.color = '#10b981';
+      }
+      
+      const monthExpensesEl = document.getElementById('monthExpenses');
+      if (monthExpensesEl) {
+        monthExpensesEl.style.color = '#ef4444';
+      }
+
+      // Total balance - dynamic color based on value
+      const totalBalanceEl = document.getElementById('totalBalance');
+      if (totalBalanceEl) {
+        // Will be updated by renderDashboard function, no override here
+      }
 
       // XP circle mini styling
       const xpCircleMini = document.getElementById('xpCircleMini');
@@ -4704,22 +6597,45 @@
 
       // Back to current button styling
       document.querySelectorAll('#backToCurrentBtn, #backToCurrentBtn2').forEach(btn => {
-        btn.style.background = 'linear-gradient(135deg, #3b82f6 0%, #0ea5e9 100%)';
+        btn.style.background = 'linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%)';
         btn.style.color = '#ffffff';
         btn.style.border = 'none';
+        btn.style.fontWeight = '600';
       });
 
       // Profile avatar circle
       document.querySelectorAll('[style*="from-green"]').forEach(el => {
-        el.style.background = 'linear-gradient(to bottom right, #3b82f6, #0ea5e9)';
+        el.style.background = 'linear-gradient(to bottom right, #2563eb, #0ea5e9)';
       });
 
-      // Achievement badges
+      // Achievement badges - light backgrounds with dark text
       document.querySelectorAll('[class*="achievement"], [class*="badge"]').forEach(el => {
         if (el.style.background && el.style.background.includes('dark')) {
-          el.style.background = '#f9fbfc';
-          el.style.borderColor = '#d5dce0';
+          el.style.background = '#f9fafb';
+          el.style.borderColor = '#e5e7eb';
+          el.style.color = '#1f2937';
         }
+      });
+
+      // Form validation messages - DARK TEXT
+      document.querySelectorAll('.error-message, .success-message, [class*="message"]').forEach(msg => {
+        msg.style.color = '#dc2626';
+      });
+
+      // Tooltip and popover text - DARK TEXT
+      document.querySelectorAll('[role="tooltip"], [class*="tooltip"], [class*="popover"]').forEach(el => {
+        el.style.color = '#1f2937';
+      });
+
+      // Card titles in sidebar - DARK TEXT
+      document.querySelectorAll('.card-title, .section-title').forEach(el => {
+        el.style.color = '#111827';
+        el.style.fontWeight = '700';
+      });
+
+      // Stats and numbers - DARK TEXT
+      document.querySelectorAll('[class*="stat"], [class*="value"], [class*="amount"]').forEach(el => {
+        el.style.color = '#1f2937';
       });
     }
 
@@ -4901,23 +6817,23 @@
 
       // Transaction type buttons - Dark default
       document.querySelectorAll('.btn-transaction-type, .btn-recurring-type, .btn-duration').forEach(btn => {
-        btn.style.background = 'transparent';
-        btn.style.borderColor = '#2a2a2a';
-        btn.style.color = '#888';
+        btn.style.background = '';
+        btn.style.borderColor = '';
+        btn.style.color = '';
       });
 
       // Income/Permanent selected - Green
       document.querySelectorAll('.btn-income-selected, .btn-permanent-selected').forEach(btn => {
-        btn.style.background = 'rgba(16, 185, 129, 0.1)';
-        btn.style.borderColor = '#10b981';
-        btn.style.color = '#10b981';
+        btn.style.background = '';
+        btn.style.borderColor = '';
+        btn.style.color = '';
       });
 
       // Expense/Temporary selected - Red
       document.querySelectorAll('.btn-expense-selected, .btn-temporary-selected').forEach(btn => {
-        btn.style.background = 'rgba(239, 68, 68, 0.1)';
-        btn.style.borderColor = '#ef4444';
-        btn.style.color = '#ef4444';
+        btn.style.background = '';
+        btn.style.borderColor = '';
+        btn.style.color = '';
       });
 
       // Installment simulation box - Green
@@ -4984,10 +6900,282 @@
         btn.style.border = 'none';
       });
 
+      // Income and expenses colors - always green and red
+      const monthIncomeEl = document.getElementById('monthIncome');
+      if (monthIncomeEl) {
+        monthIncomeEl.style.color = '#10b981';
+      }
+      
+      const monthExpensesEl = document.getElementById('monthExpenses');
+      if (monthExpensesEl) {
+        monthExpensesEl.style.color = '#ef4444';
+      }
+
       // Profile avatar - Green gradient
       document.querySelectorAll('[class*="from-green"]').forEach(el => {
         el.style.background = 'linear-gradient(to bottom right, #10b981, #059669)';
       });
+    }
+
+    // ===== FUNÇÕES DE CONFIGURAÇÕES =====
+
+    function updateSettingsPage() {
+      try {
+        if (currentUser) {
+          // Username
+          const usernameEl = document.getElementById('settingsUsername');
+          if (usernameEl) {
+            const savedName = localStorage.getItem(`userName_${currentUser.id}`) || 
+                            currentUser.user_metadata?.name || 
+                            currentUser.email?.split('@')[0] || 
+                            'Usuário';
+            usernameEl.value = savedName;
+          }
+          
+          // Preferências
+          const prefs = JSON.parse(localStorage.getItem('userPreferences') || '{}');
+          const projEl = document.getElementById('showProjections');
+          const notifEl = document.getElementById('notifications');
+          const autoSaveEl = document.getElementById('autoSave');
+          
+          if (projEl) projEl.checked = prefs.showProjections !== false;
+          if (notifEl) notifEl.checked = prefs.notifications !== false;
+          if (autoSaveEl) autoSaveEl.checked = prefs.autoSave !== false;
+          
+          // Estatísticas
+          document.getElementById('statsTransactions').textContent = transactions.length;
+          document.getElementById('statsCards').textContent = cards.length;
+          document.getElementById('statsGoals').textContent = goals.length;
+          document.getElementById('statsRecurring').textContent = recurringTransactions.length;
+        }
+      } catch (error) {
+        console.error('Erro ao atualizar página de configurações:', error);
+      }
+    }
+
+    function updateUserProfile() {
+      try {
+        const newName = document.getElementById('settingsUsername').value || 'Usuário';
+        
+        if (!newName.trim()) {
+          showToast('Nome não pode estar vazio', 'warning');
+          return;
+        }
+        
+        // Salvar no localStorage com ID do usuário
+        localStorage.setItem(`userName_${currentUser.id}`, newName);
+        
+        showToast('✓ Perfil atualizado com sucesso!', 'success');
+        
+        // Atualizar nome no perfil do menu
+        updateUserProfileName();
+        
+        updateSettingsPage();
+      } catch (error) {
+        console.error('Erro ao atualizar perfil:', error);
+        showToast('Erro ao salvar perfil', 'error');
+      }
+    }
+
+    function savePreference(key, value) {
+      try {
+        const preferences = JSON.parse(localStorage.getItem('userPreferences') || '{}');
+        preferences[key] = value;
+        localStorage.setItem('userPreferences', JSON.stringify(preferences));
+        
+        const labels = {
+          'showProjections': 'Projeções',
+          'notifications': 'Notificações',
+          'autoSave': 'Auto-save'
+        };
+        
+        showToast(`✓ ${labels[key]} ${value ? 'ativado' : 'desativado'}`, 'success');
+      } catch (error) {
+        console.error('Erro ao salvar preferência:', error);
+      }
+    }
+
+    function exportData() {
+      try {
+        const currentBalance = calculateRealBalance();
+        
+        const dataToExport = {
+          exportDate: new Date().toISOString(),
+          user: {
+            id: currentUser.id,
+            email: currentUser.email,
+            name: localStorage.getItem(`userName_${currentUser.id}`) || 'Usuário'
+          },
+          data: {
+            transactions: transactions.map(t => ({
+              ...t,
+              date: new Date(t.date).toLocaleDateString('pt-BR')
+            })),
+            cards: cards,
+            goals: goals,
+            recurringTransactions: recurringTransactions,
+            categories: categories
+          },
+          summary: {
+            exportedAt: new Date().toLocaleString('pt-BR'),
+            totalTransactions: transactions.length,
+            totalCards: cards.length,
+            totalGoals: goals.length,
+            totalRecurring: recurringTransactions.length,
+            currentBalance: currentBalance,
+            formattedBalance: formatCurrency(currentBalance)
+          }
+        };
+
+        const dataString = JSON.stringify(dataToExport, null, 2);
+        const dataBlob = new Blob([dataString], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(dataBlob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `finance-flow-backup-${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        showToast('✓ Dados exportados com sucesso!', 'success');
+      } catch (error) {
+        console.error('Erro ao exportar dados:', error);
+        showToast('Erro ao exportar dados', 'error');
+      }
+    }
+
+    function changePassword() {
+      const modal = document.createElement('div');
+      modal.className = 'modal active';
+      modal.innerHTML = `
+        <div class="modal-content max-w-md">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-2xl font-bold">🔑 Redefinir Senha</h3>
+            <button onclick="this.closest('.modal').remove()" class="text-gray-400 hover:text-white">
+              <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+            </button>
+          </div>
+          <div class="space-y-4">
+            <p class="text-gray-300">Um email de redefinição de senha será enviado para:</p>
+            <p class="text-blue-400 font-semibold">${currentUser.email}</p>
+            <button class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors" onclick="sendPasswordResetEmail('${currentUser.email}')">
+              Enviar Email de Redefinição
+            </button>
+            <p class="text-xs text-gray-500 text-center">Verifique sua caixa de spam se não receber em alguns minutos</p>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      modal.onclick = (e) => {
+        if (e.target === modal) modal.remove();
+      };
+    }
+
+    async function sendPasswordResetEmail(email) {
+      try {
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}?reset=true`
+        });
+        
+        if (error) throw error;
+        
+        showToast('✓ Email de redefinição enviado! Verifique sua caixa de entrada', 'success');
+        document.querySelector('.modal.active')?.remove();
+      } catch (error) {
+        console.error('Erro ao enviar email:', error);
+        showToast('Erro ao enviar email de redefinição', 'error');
+      }
+    }
+
+    async function logout() {
+      if (confirm('Tem certeza que deseja sair da sua conta?')) {
+        try {
+          const { error } = await supabaseClient.auth.signOut();
+          
+          if (error) throw error;
+          
+          currentUser = null;
+          transactions = [];
+          cards = [];
+          goals = [];
+          recurringTransactions = [];
+          categories = [];
+          
+          localStorage.removeItem('currentUser');
+          localStorage.removeItem('manualBalanceAdjustments');
+          
+          document.getElementById('dashboardPage').classList.remove('active');
+          document.getElementById('authPage').classList.add('active');
+          
+          showToast('✓ Você saiu com sucesso!', 'success');
+        } catch (error) {
+          console.error('Erro ao fazer logout:', error);
+          showToast('Erro ao sair da conta', 'error');
+        }
+      }
+    }
+
+    function confirmDeleteAllData() {
+      const modal = document.createElement('div');
+      modal.className = 'modal active';
+      modal.innerHTML = `
+        <div class="modal-content max-w-md">
+          <div class="flex items-center justify-between mb-4">
+            <h3 class="text-2xl font-bold text-red-500">⚠️ Apagar TUDO?</h3>
+            <button onclick="this.closest('.modal').remove()" class="text-gray-400 hover:text-white">
+              <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+            </button>
+          </div>
+          <div class="space-y-4 mb-4">
+            <div class="bg-red-900 bg-opacity-30 border border-red-600 rounded-lg p-3">
+              <p class="text-red-300 text-sm">Esta ação é IRREVERSÍVEL! Todos os seus dados serão permanentemente deletados.</p>
+            </div>
+            <p class="text-gray-400 text-sm">Isso inclui:</p>
+            <ul class="text-xs text-gray-500 space-y-1 ml-4">
+              <li>✗ ${transactions.length} transações</li>
+              <li>✗ ${cards.length} cartões</li>
+              <li>✗ ${goals.length} metas</li>
+              <li>✗ ${recurringTransactions.length} recorrências</li>
+            </ul>
+          </div>
+          <div class="space-y-3">
+            <input type="text" placeholder="Digite 'DELETAR' para confirmar" id="confirmDeleteInput" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-2 text-white placeholder-gray-500 focus:border-red-500 focus:outline-none">
+            <div class="flex gap-3">
+              <button class="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors" onclick="this.closest('.modal').remove()">
+                Cancelar
+              </button>
+              <button class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors" onclick="deleteAllDataConfirmed(this)">
+                Deletar
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      modal.onclick = (e) => {
+        if (e.target === modal) modal.remove();
+      };
+    }
+
+    async function deleteAllDataConfirmed(button) {
+      const input = document.getElementById('confirmDeleteInput');
+      if (input.value.toUpperCase() !== 'DELETAR') {
+        showToast('Digite "DELETAR" para confirmar', 'warning');
+        return;
+      }
+      
+      button.disabled = true;
+      button.textContent = 'Deletando...';
+      
+      try {
+        await executeDeleteAllData();
+      } catch (error) {
+        console.error('Erro ao deletar dados:', error);
+        button.disabled = false;
+        button.textContent = 'Deletar';
+      }
     }
 
     // Initialize app
