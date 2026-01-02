@@ -185,8 +185,11 @@
     </div>
    </aside><!-- Mobile Menu Toggle Button -->
    <button id="mobileMenuToggle" class="mobile-menu-toggle" onclick="toggleMobileMenu()" title="Abrir menu">
-    <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="menu-icon">
      <path d="M3 6H21M3 12H21M3 18H21" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+    <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="close-icon" style="display: none; position: absolute;">
+     <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
    </button>
    <!-- Overlay para fechar menu ao clicar fora -->
@@ -203,22 +206,22 @@
         </div>
        </div>
        <div class="relative order-1 md:order-2 w-full md:w-auto">
-        <div class="flex items-center gap-3 rounded-xl px-5 py-3 shadow-xl transition-all month-selector"><button onclick="changeMonth(-1)" class="text-gray-400 hover:text-green-400 transition-all p-2 hover:bg-green-900 hover:bg-opacity-30 rounded-lg">
+        <div class="flex items-center justify-between gap-0 rounded-xl px-5 py-3 shadow-xl transition-all month-selector"><button onclick="changeMonth(-1)" class="text-gray-400 hover:text-green-400 transition-all p-2 hover:bg-green-900 hover:bg-opacity-30 rounded-lg flex-shrink-0">
           <svg width="18" height="18" viewbox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11 4L7 9L11 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
           </svg></button>
-         <div class="text-center min-w-[180px] pb-2">
+         <div class="text-center flex-1">
           <p id="currentMonthLabel" class="text-sm font-bold month-label"></p>
-         </div><button onclick="changeMonth(1)" class="text-gray-400 hover:text-green-400 transition-all p-2 hover:bg-green-900 hover:bg-opacity-30 rounded-lg">
+         </div><button onclick="changeMonth(1)" class="text-gray-400 hover:text-green-400 transition-all p-2 hover:bg-green-900 hover:bg-opacity-30 rounded-lg flex-shrink-0">
           <svg width="18" height="18" viewbox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 4L11 9L7 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
           </svg></button>
-        </div><button id="backToCurrentBtn" onclick="backToCurrentMonth()" class="absolute left-1/2 -translate-x-1/2 -bottom-3 text-xs bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-full transition-all flex items-center shadow-lg hover:shadow-green-900 hover:scale-105 z-10" style="display: none;"> Hoje </button>
+        </div><button id="backToCurrentBtn" onclick="backToCurrentMonth()" class="absolute left-1/2 -translate-x-1/2 text-xs bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-full transition-all flex items-center shadow-lg hover:shadow-green-900 hover:scale-105 z-10" style="display: none; top: calc(100% + 2px);"> Hoje </button>
        </div>
        <div class="hidden md:flex items-center gap-2 order-3"><button class="btn-primary" style="width: auto;" onclick="openTransactionModal()">
          <svg class="inline-block mr-2" width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
          </svg> Nova Transação </button>
        </div>
       </div><!-- Stats Grid -->
-      <div class="flex flex-col gap-4 mb-6">
+      <div class="stats-grid mb-6">
        <div class="stat-card cursor-pointer hover:opacity-80 transition-opacity" onclick="openAdjustBalanceModal()">
         <div class="flex items-center justify-between mb-2"><span class="text-gray-400 text-sm">Saldo Total</span>
          <div class="flex items-center gap-2">
@@ -229,21 +232,19 @@
         </div>
         <p id="totalBalance" class="text-3xl font-bold text-green-500">R$ 0,00</p>
        </div>
-       <div class="grid grid-cols-2 gap-4 md:grid-cols-2">
-        <div class="stat-card">
-         <div class="flex items-center justify-between mb-2"><span class="text-gray-400 text-sm">Receitas (mês)</span>
-          <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 19V5M12 5L5 12M12 5L19 12" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-         </div>
-         <p id="monthIncome" class="text-3xl font-bold text-green-500">R$ 0,00</p>
+       <div class="stat-card">
+        <div class="flex items-center justify-between mb-2"><span class="text-gray-400 text-sm">Receitas (mês)</span>
+         <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 19V5M12 5L5 12M12 5L19 12" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+         </svg>
         </div>
-        <div class="stat-card">
-         <div class="flex items-center justify-between mb-2"><span class="text-gray-400 text-sm">Despesas (mês)</span>
-          <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5V19M12 19L19 12M12 19L5 12" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-         </div>
-         <p id="monthExpenses" class="text-3xl font-bold text-red-500">R$ 0,00</p>
+        <p id="monthIncome" class="text-3xl font-bold text-green-500">R$ 0,00</p>
+       </div>
+       <div class="stat-card">
+        <div class="flex items-center justify-between mb-2"><span class="text-gray-400 text-sm">Despesas (mês)</span>
+         <svg width="24" height="24" viewbox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 5V19M12 19L19 12M12 19L5 12" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+         </svg>
         </div>
+        <p id="monthExpenses" class="text-3xl font-bold text-red-500">R$ 0,00</p>
        </div>
       </div><!-- Charts -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -265,30 +266,30 @@
      </div>
     </div><!-- Transactions Page -->
     <div id="transactionsPage" class="page">
-     <div class="p-6" style="padding-top: 100px;">
-      <div class="flex flex-col md:flex-row items-center justify-between mb-6 gap-4" style="margin-top: 30px;">
-       <div class="flex items-center justify-between gap-4 w-full md:w-auto" style="margin-top: 0;">
+     <div class="p-6">
+      <div class="flex flex-col md:flex-row items-center justify-center md:justify-between mb-6 gap-4">
+       <div class="flex items-center justify-between gap-4 order-2 md:order-1 w-full md:w-auto">
         <h2 class="text-3xl font-bold">Transações</h2>
         <div class="flex items-center gap-2 md:hidden"><button class="btn-primary" style="width: auto;" onclick="openTransactionModal()">
           <svg class="inline-block mr-2" width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
           </svg> Nova Transação </button>
         </div>
        </div>
-       <div class="hidden md:flex items-center gap-2"><button class="btn-primary" style="width: auto;" onclick="openTransactionModal()">
+       <div class="relative order-1 md:order-2 w-full md:w-auto">
+        <div class="flex items-center justify-between gap-0 rounded-xl px-5 py-3 shadow-xl transition-all month-selector"><button onclick="changeMonth(-1)" class="text-gray-400 hover:text-green-400 transition-all p-2 hover:bg-green-900 hover:bg-opacity-30 rounded-lg flex-shrink-0">
+          <svg width="18" height="18" viewbox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11 4L7 9L11 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg></button>
+         <div class="text-center flex-1">
+          <p id="transactionsMonthLabel" class="text-sm font-bold month-label"></p>
+         </div><button onclick="changeMonth(1)" class="text-gray-400 hover:text-green-400 transition-all p-2 hover:bg-green-900 hover:bg-opacity-30 rounded-lg flex-shrink-0">
+          <svg width="18" height="18" viewbox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 4L11 9L7 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg></button>
+        </div><button id="backToCurrentBtn2" onclick="backToCurrentMonth()" class="absolute left-1/2 -translate-x-1/2 text-xs bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-full transition-all flex items-center shadow-lg hover:shadow-green-900 hover:scale-105 z-10" style="display: none; top: calc(100% + 2px);"> Hoje </button>
+       </div>
+       <div class="hidden md:flex items-center gap-2 order-3"><button class="btn-primary" style="width: auto;" onclick="openTransactionModal()">
          <svg class="inline-block mr-2" width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
          </svg> Nova Transação </button>
        </div>
-      </div>
-      <div class="relative" style="position: fixed; top: 16px; right: 16px; left: 80px; z-index: 50; @media (min-width: 768px) { position: relative; top: auto; right: auto; left: auto; z-index: auto; }">
-       <div class="flex items-center gap-3 rounded-xl px-5 py-3 shadow-xl transition-all month-selector"><button onclick="changeMonth(-1)" class="text-gray-400 hover:text-green-400 transition-all p-2 hover:bg-green-900 hover:bg-opacity-30 rounded-lg">
-         <svg width="18" height="18" viewbox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11 4L7 9L11 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-         </svg></button>
-        <div class="text-center min-w-[180px] pb-2">
-         <p id="transactionsMonthLabel" class="text-sm font-bold month-label"></p>
-        </div><button onclick="changeMonth(1)" class="text-gray-400 hover:text-green-400 transition-all p-2 hover:bg-green-900 hover:bg-opacity-30 rounded-lg">
-         <svg width="18" height="18" viewbox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 4L11 9L7 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-         </svg></button>
-       </div><button id="backToCurrentBtn2" onclick="backToCurrentMonth()" class="absolute left-1/2 -translate-x-1/2 -bottom-3 text-xs bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-full transition-all flex items-center shadow-lg hover:shadow-green-900 hover:scale-105 z-10" style="display: none;"> Hoje </button>
       </div>
       <div class="mb-4 flex gap-2"><button class="btn-secondary text-sm" style="width: auto;" onclick="filterTransactions('all')">Todas</button> <button class="btn-secondary text-sm" style="width: auto;" onclick="filterTransactions('receita')">Receitas</button> <button class="btn-secondary text-sm" style="width: auto;" onclick="filterTransactions('despesa')">Despesas</button>
       </div>
@@ -431,48 +432,68 @@
     </div><!-- Settings Page -->
     <div id="settingsPage" class="page">
      <div class="p-6 max-w-4xl mx-auto">
-      <h2 class="text-3xl font-bold mb-8">⚙️ Configurações</h2>
+      <div class="mb-8">
+       <div class="flex items-center gap-3 mb-2">
+        <svg class="w-8 h-8 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"></circle><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m5.08 5.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m5.08-5.08l4.24-4.24"></path></svg>
+        <h2 class="text-3xl font-bold">Configurações</h2>
+       </div>
+       <p class="text-gray-400 text-sm">Personalize sua experiência no FinanceFlow</p>
+      </div>
       
       <!-- Tema -->
       <div class="stat-card mb-6">
-       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-xl font-bold">🎨 Aparência</h3>
-        <span class="text-xs bg-blue-500 bg-opacity-20 text-blue-400 px-3 py-1 rounded-full">Tema</span>
+       <div class="flex items-center gap-3 mb-4">
+        <svg class="w-6 h-6 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+        <div>
+         <h3 class="text-lg font-bold">Aparência</h3>
+         <p class="text-xs text-gray-400">Escolha o tema visual</p>
+        </div>
        </div>
        <div class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
-         <button class="py-4 px-4 rounded-lg font-semibold transition-all border-2 hover:scale-105" id="themeDarkBtn" onclick="setTheme('dark')" style="border-color: var(--primary-color, #3b82f6);">
-          <div class="text-2xl mb-2">⚡</div>
-          <div class="font-bold">Turbo</div>
-          <div class="text-xs text-gray-400 mt-1">Escuro</div>
+         <button class="py-4 px-4 rounded-lg font-semibold transition-all border-2" id="themeDarkBtn" onclick="setTheme('dark')" style="border-color: var(--primary-color, #3b82f6);">
+          <div class="flex justify-center mb-2">
+           <svg class="w-6 h-6 text-gray-300" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          </div>
+          <div class="font-semibold text-sm">Escuro</div>
+          <div class="text-xs text-gray-400 mt-1">Tema noturno</div>
          </button>
-         <button class="py-4 px-4 rounded-lg font-semibold transition-all border-2 hover:scale-105" id="themeLightBtn" onclick="setTheme('light')">
-          <div class="text-2xl mb-2">✨</div>
-          <div class="font-bold">Minimal</div>
-          <div class="text-xs text-gray-400 mt-1">Claro</div>
+         <button class="py-4 px-4 rounded-lg font-semibold transition-all border-2 border-gray-600 hover:border-yellow-500" id="themeLightBtn" onclick="setTheme('light')">
+          <div class="flex justify-center mb-2">
+           <svg class="w-6 h-6 text-yellow-400" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          </div>
+          <div class="font-semibold text-sm">Claro</div>
+          <div class="text-xs text-gray-400 mt-1">Tema diurno</div>
          </button>
         </div>
-        <p class="text-xs text-gray-500">Escolha o tema que prefere para melhor experiência visual</p>
        </div>
       </div>
 
       <!-- Perfil -->
       <div class="stat-card mb-6">
-       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-xl font-bold">👤 Perfil</h3>
-        <span class="text-xs bg-green-500 bg-opacity-20 text-green-400 px-3 py-1 rounded-full">Usuário</span>
+       <div class="flex items-center gap-3 mb-4">
+        <svg class="w-6 h-6 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        <div>
+         <h3 class="text-lg font-bold">Perfil</h3>
+         <p class="text-xs text-gray-400">Informações da sua conta</p>
+        </div>
        </div>
        <div class="space-y-4">
         <div>
-         <label class="block text-sm font-semibold mb-2">👤 Nome de Usuário</label>
-         <input type="text" id="settingsUsername" placeholder="Seu nome" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none">
+         <label class="block text-sm font-semibold mb-2 flex items-center gap-2">
+          <svg class="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          Nome de Usuário
+         </label>
+         <input type="text" id="settingsUsername" placeholder="Seu nome" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none transition-colors">
         </div>
         <div class="flex gap-3">
-         <button class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors" onclick="updateUserProfile()">
-          ✓ Salvar
+         <button class="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors" onclick="updateUserProfile()">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          Salvar
          </button>
-         <button class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg transition-colors" onclick="changePassword()">
-          🔑 Senha
+         <button class="flex-1 flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors" onclick="changePassword()">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          Senha
          </button>
         </div>
        </div>
@@ -480,97 +501,100 @@
 
       <!-- Preferências -->
       <div class="stat-card mb-6">
-       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-xl font-bold">📋 Preferências</h3>
-        <span class="text-xs bg-purple-500 bg-opacity-20 text-purple-400 px-3 py-1 rounded-full">Sistema</span>
+       <div class="flex items-center gap-3 mb-4">
+        <svg class="w-6 h-6 text-purple-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        <div>
+         <h3 class="text-lg font-bold">Notificações</h3>
+         <p class="text-xs text-gray-400">Gerencie seus alertas</p>
+        </div>
        </div>
-       <div class="space-y-4">
-        <div class="flex items-center justify-between p-3 bg-gray-700 bg-opacity-30 rounded-lg">
-         <div>
-          <div class="font-semibold">📊 Mostrar Projeções</div>
-          <p class="text-xs text-gray-400">Exibir transações recorrentes previstas</p>
+       <div class="space-y-3">
+        <div class="flex items-center justify-between p-4 bg-gray-700 bg-opacity-20 rounded-lg border border-gray-700 hover:border-purple-500 hover:bg-opacity-30 transition-all">
+         <div class="flex items-center gap-3">
+          <svg class="w-5 h-5 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+          <div>
+           <div class="font-semibold text-sm">Ativar Notificações</div>
+           <p class="text-xs text-gray-400">Receba avisos de transações e metas</p>
+          </div>
          </div>
-         <input type="checkbox" id="showProjections" checked class="w-5 h-5 cursor-pointer" onchange="savePreference('showProjections', this.checked)">
-        </div>
-        <div class="flex items-center justify-between p-3 bg-gray-700 bg-opacity-30 rounded-lg">
-         <div>
-          <div class="font-semibold">🔔 Notificações</div>
-          <p class="text-xs text-gray-400">Avisos de transações e metas</p>
-         </div>
-         <input type="checkbox" id="notifications" checked class="w-5 h-5 cursor-pointer" onchange="savePreference('notifications', this.checked)">
-        </div>
-        <div class="flex items-center justify-between p-3 bg-gray-700 bg-opacity-30 rounded-lg">
-         <div>
-          <div class="font-semibold">💾 Salvar Automaticamente</div>
-          <p class="text-xs text-gray-400">Sincronizar com servidor em tempo real</p>
-         </div>
-         <input type="checkbox" id="autoSave" checked class="w-5 h-5 cursor-pointer" onchange="savePreference('autoSave', this.checked)">
+         <input type="checkbox" id="notifications" checked class="w-5 h-5 cursor-pointer rounded accent-blue-500" onchange="savePreference('notifications', this.checked)">
         </div>
        </div>
       </div>
 
       <!-- Dados -->
       <div class="stat-card mb-6">
-       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-xl font-bold">💾 Dados</h3>
-        <span class="text-xs bg-yellow-500 bg-opacity-20 text-yellow-400 px-3 py-1 rounded-full">Cuidado</span>
+       <div class="flex items-center gap-3 mb-4">
+        <svg class="w-6 h-6 text-yellow-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+        <div>
+         <h3 class="text-lg font-bold">Dados</h3>
+         <p class="text-xs text-gray-400">Importe, exporte ou remova seus dados</p>
+        </div>
        </div>
        <div class="space-y-3">
-        <div class="bg-blue-900 bg-opacity-30 border border-blue-600 rounded-lg p-4 mb-4">
-         <p class="text-sm text-blue-300">💡 Dica: Exporte seus dados regularmente para não perder informações importantes</p>
+        <div class="bg-blue-900 bg-opacity-20 border border-blue-600 border-opacity-50 rounded-lg p-4 flex gap-3">
+         <svg class="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+         <p class="text-sm text-blue-300">Recomendamos exportar seus dados regularmente para manter um backup seguro</p>
         </div>
         <button class="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors" onclick="exportData()">
-         <svg width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 2V8M8 8L11 11M8 8L5 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /> <path d="M2 11V13C2 13.5523 2.44772 14 3 14H13C13.5523 14 14 13.5523 14 13V11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
          Exportar Dados (JSON)
         </button>
         <button class="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors" onclick="confirmDeleteAllData()">
-         <svg width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 4H13M12 4V13C12 13.5523 11.5523 14 11 14H5C4.44772 14 4 13.5523 4 13V4M6 4V3C6 2.44772 6.44772 2 7 2H9C9.55228 2 10 2.44772 10 3V4M7 7V12M9 7V12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
          Limpar TODOS os Dados
         </button>
-        <p class="text-xs text-red-400 text-center">⚠️ Esta ação é irreversível!</p>
+        <p class="text-xs text-red-400 text-center font-semibold">⚠️ Esta ação é irreversível</p>
        </div>
       </div>
 
-      <!-- Sobre -->
+      <!-- Estatísticas -->
       <div class="stat-card mb-6">
-       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-xl font-bold">ℹ️ Sobre</h3>
-        <span class="text-xs bg-gray-600 bg-opacity-50 text-gray-300 px-3 py-1 rounded-full">v1.0.0</span>
+       <div class="flex items-center gap-3 mb-4">
+        <svg class="w-6 h-6 text-cyan-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="2" x2="12" y2="22"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+        <div>
+         <h3 class="text-lg font-bold">Estatísticas</h3>
+         <p class="text-xs text-gray-400">Resumo da sua atividade</p>
+        </div>
+        <span class="text-xs bg-gray-600 bg-opacity-50 text-gray-300 px-3 py-1 rounded-full ml-auto">v1.0.0</span>
        </div>
-       <div class="space-y-3">
-        <div class="grid grid-cols-2 gap-3 text-center">
-         <div class="bg-gray-700 bg-opacity-30 rounded-lg p-4">
-          <div class="text-2xl font-bold text-blue-400" id="statsTransactions">0</div>
-          <div class="text-xs text-gray-400 mt-1">Transações</div>
-         </div>
-         <div class="bg-gray-700 bg-opacity-30 rounded-lg p-4">
-          <div class="text-2xl font-bold text-green-400" id="statsCards">0</div>
-          <div class="text-xs text-gray-400 mt-1">Cartões</div>
-         </div>
-         <div class="bg-gray-700 bg-opacity-30 rounded-lg p-4">
-          <div class="text-2xl font-bold text-yellow-400" id="statsGoals">0</div>
-          <div class="text-xs text-gray-400 mt-1">Metas</div>
-         </div>
-         <div class="bg-gray-700 bg-opacity-30 rounded-lg p-4">
-          <div class="text-2xl font-bold text-purple-400" id="statsRecurring">0</div>
-          <div class="text-xs text-gray-400 mt-1">Recorrências</div>
-         </div>
+       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="bg-gradient-to-br from-blue-600 to-blue-700 bg-opacity-20 rounded-lg p-4 border border-blue-600 border-opacity-30">
+         <div class="text-xs text-blue-400 mb-1">Transações</div>
+         <div class="text-2xl font-bold text-blue-300" id="statsTransactions">0</div>
+        </div>
+        <div class="bg-gradient-to-br from-green-600 to-green-700 bg-opacity-20 rounded-lg p-4 border border-green-600 border-opacity-30">
+         <div class="text-xs text-green-400 mb-1">Cartões</div>
+         <div class="text-2xl font-bold text-green-300" id="statsCards">0</div>
+        </div>
+        <div class="bg-gradient-to-br from-yellow-600 to-yellow-700 bg-opacity-20 rounded-lg p-4 border border-yellow-600 border-opacity-30">
+         <div class="text-xs text-yellow-400 mb-1">Metas</div>
+         <div class="text-2xl font-bold text-yellow-300" id="statsGoals">0</div>
+        </div>
+        <div class="bg-gradient-to-br from-purple-600 to-purple-700 bg-opacity-20 rounded-lg p-4 border border-purple-600 border-opacity-30">
+         <div class="text-xs text-purple-400 mb-1">Recorrências</div>
+         <div class="text-2xl font-bold text-purple-300" id="statsRecurring">0</div>
         </div>
        </div>
       </div>
 
       <!-- Segurança -->
       <div class="stat-card">
-       <div class="flex items-center justify-between mb-4">
-        <h3 class="text-xl font-bold">🔐 Segurança</h3>
-        <span class="text-xs bg-red-500 bg-opacity-20 text-red-400 px-3 py-1 rounded-full">Conta</span>
+       <div class="flex items-center gap-3 mb-4">
+        <svg class="w-6 h-6 text-red-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        <div>
+         <h3 class="text-lg font-bold">Segurança</h3>
+         <p class="text-xs text-gray-400">Gerenciar sua conta</p>
+        </div>
        </div>
        <div class="space-y-3">
-        <button class="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold py-3 px-4 rounded-lg transition-colors" onclick="changePassword()">
-         🔑 Alterar Senha
+        <button class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-gray-700 to-gray-800 hover:from-gray-600 hover:to-gray-700 text-gray-200 font-semibold py-3 px-4 rounded-lg transition-all border border-gray-700" onclick="changePassword()">
+         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+         Alterar Senha
         </button>
-        <button class="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold py-3 px-4 rounded-lg transition-colors" onclick="logout()">
-         🚪 Sair da Conta
+        <button class="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-red-700 to-red-800 hover:from-red-600 hover:to-red-700 text-white font-semibold py-3 px-4 rounded-lg transition-all border border-red-700" onclick="logout()">
+         <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+         Sair da Conta
         </button>
        </div>
       </div>

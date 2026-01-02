@@ -304,17 +304,36 @@
     function toggleMobileMenu() {
       const sidebar = document.getElementById('sidebar');
       const overlay = document.getElementById('mobileMenuOverlay');
+      const toggle = document.getElementById('mobileMenuToggle');
+      const menuIcon = toggle.querySelector('.menu-icon');
+      const closeIcon = toggle.querySelector('.close-icon');
       
       sidebar.classList.toggle('active');
       overlay.classList.toggle('active');
+      toggle.classList.toggle('active');
+      
+      if (sidebar.classList.contains('active')) {
+        menuIcon.style.display = 'none';
+        closeIcon.style.display = 'block';
+      } else {
+        menuIcon.style.display = 'block';
+        closeIcon.style.display = 'none';
+      }
     }
 
     function closeMobileMenu() {
       const sidebar = document.getElementById('sidebar');
       const overlay = document.getElementById('mobileMenuOverlay');
+      const toggle = document.getElementById('mobileMenuToggle');
+      const menuIcon = toggle.querySelector('.menu-icon');
+      const closeIcon = toggle.querySelector('.close-icon');
       
       sidebar.classList.remove('active');
       overlay.classList.remove('active');
+      toggle.classList.remove('active');
+      
+      menuIcon.style.display = 'block';
+      closeIcon.style.display = 'none';
     }
 
     // Close mobile menu when navigating
@@ -408,6 +427,7 @@
         const categoriesResult = await supabaseClient
           .from('categories')
           .select('*')
+          .eq('user_id', currentUser.id)
           .order('name', { ascending: true });
         
         if (categoriesResult.error) {
@@ -497,7 +517,8 @@
             await supabaseClient
               .from('recurring_transactions')
               .update({ is_active: false })
-              .eq('id', recurring.id);
+              .eq('id', recurring.id)
+              .eq('user_id', currentUser.id);
             continue;
           }
         }
@@ -3351,7 +3372,8 @@
         const { error } = await supabaseClient
           .from('transactions')
           .delete()
-          .eq('id', transactionId);
+          .eq('id', transactionId)
+          .eq('user_id', currentUser.id);
         
         if (error) throw error;
 
@@ -3395,7 +3417,8 @@
           const { error } = await supabaseClient
             .from('transactions')
             .delete()
-            .eq('id', transaction.id);
+            .eq('id', transaction.id)
+            .eq('user_id', currentUser.id);
           
           if (error) throw error;
         }
@@ -3450,7 +3473,8 @@
         const { error } = await supabaseClient
           .from('recurring_transactions')
           .delete()
-          .eq('id', recurringId);
+          .eq('id', recurringId)
+          .eq('user_id', currentUser.id);
         
         if (error) throw error;
 
@@ -3858,7 +3882,8 @@
             category: category,
             date: date
           })
-          .eq('id', transactionId);
+          .eq('id', transactionId)
+          .eq('user_id', currentUser.id);
         
         if (error) throw error;
 
@@ -4705,20 +4730,20 @@
         // Deletar todas as transações vinculadas
         const linkedTransactions = transactions.filter(t => t.card_id === cardId);
         for (const transaction of linkedTransactions) {
-          await supabaseClient.from('transactions').delete().eq('id', transaction.id);
+          await supabaseClient.from('transactions').delete().eq('id', transaction.id).eq('user_id', currentUser.id);
         }
 
         // Deletar todas as recorrências vinculadas
         const cardMappings = JSON.parse(localStorage.getItem('recurring_card_mappings') || '{}');
         const linkedRecurrings = recurringTransactions.filter(r => cardMappings[r.id] === cardId);
         for (const recurring of linkedRecurrings) {
-          await supabaseClient.from('recurring_transactions').delete().eq('id', recurring.id);
+          await supabaseClient.from('recurring_transactions').delete().eq('id', recurring.id).eq('user_id', currentUser.id);
           delete cardMappings[recurring.id];
         }
         localStorage.setItem('recurring_card_mappings', JSON.stringify(cardMappings));
 
         // Deletar o cartão
-        await supabaseClient.from('cards').delete().eq('id', cardId);
+        await supabaseClient.from('cards').delete().eq('id', cardId).eq('user_id', currentUser.id);
 
         showToast('Cartão e todos os dados vinculados foram deletados com sucesso!', 'success');
         document.querySelector('.modal.active').remove();
@@ -5087,7 +5112,7 @@
           deleteBtn.textContent = 'Excluindo...';
         }
         
-        const { error } = await supabaseClient.from('goals').delete().eq('id', goalId);
+        const { error } = await supabaseClient.from('goals').delete().eq('id', goalId).eq('user_id', currentUser.id);
         if (error) throw error;
 
         showToast('Meta deletada com sucesso!', 'success');
@@ -5166,7 +5191,8 @@
         
         const { error: goalError } = await supabaseClient.from('goals')
           .update({ current_amount: newAmount })
-          .eq('id', goalId);
+          .eq('id', goalId)
+          .eq('user_id', currentUser.id);
         
         if (goalError) throw goalError;
 
@@ -5263,7 +5289,8 @@
         
         const { error: goalError } = await supabaseClient.from('goals')
           .update({ current_amount: Math.max(0, newAmount) })
-          .eq('id', goalId);
+          .eq('id', goalId)
+          .eq('user_id', currentUser.id);
         
         if (goalError) throw goalError;
 
@@ -5507,7 +5534,8 @@
                   last_generated_month: currentMonth,
                   last_generated_year: currentYear
                 })
-                .eq('id', recurring.id);
+                .eq('id', recurring.id)
+                .eq('user_id', currentUser.id);
             }
           }
           
@@ -5616,9 +5644,35 @@
         const { error } = await supabaseClient
           .from('categories')
           .delete()
-          .eq('id', categoryId);
+          .eq('id', categoryId)
+          .eq('user_id', currentUser.id);
         
         if (error) throw error;
+
+        // Recarregar categorias
+        const categoriesResult = await supabaseClient
+          .from('categories')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .order('name', { ascending: true });
+        
+        // Se não há mais categorias, restaurar as padrões
+        if (!categoriesResult.data || categoriesResult.data.length === 0) {
+          const defaultCategories = [
+            { name: 'Salário', type: 'receita', user_id: currentUser.id },
+            { name: 'Freelance', type: 'receita', user_id: currentUser.id },
+            { name: 'Investimento', type: 'receita', user_id: currentUser.id },
+            { name: 'Alimentação', type: 'despesa', user_id: currentUser.id },
+            { name: 'Transporte', type: 'despesa', user_id: currentUser.id },
+            { name: 'Moradia', type: 'despesa', user_id: currentUser.id }
+          ];
+
+          const { error: insertError } = await supabaseClient
+            .from('categories')
+            .insert(defaultCategories);
+          
+          if (insertError) throw insertError;
+        }
 
         showToast('Categoria excluída com sucesso!', 'success');
         document.querySelector('.modal.active').remove();
@@ -5955,6 +6009,12 @@
     };
 
     function showToast(message, type = 'info') {
+      // Verificar se notificações estão ativadas
+      const preferences = JSON.parse(localStorage.getItem('userPreferences') || '{}');
+      if (preferences.notifications === false) {
+        return; // Não mostrar notificações se desativadas
+      }
+
       const existingToast = document.querySelector('.toast');
       if (existingToast) {
         existingToast.remove();
