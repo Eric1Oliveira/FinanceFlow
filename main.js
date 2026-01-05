@@ -39,12 +39,6 @@
       { id: 4, name: 'Alimentação', type: 'despesa' },
       { id: 5, name: 'Transporte', type: 'despesa' },
       { id: 6, name: 'Moradia', type: 'despesa' },
-      { id: 7, name: 'Saúde', type: 'despesa' },
-      { id: 8, name: 'Educação', type: 'despesa' },
-      { id: 9, name: 'Lazer', type: 'despesa' },
-      { id: 10, name: 'Compras', type: 'despesa' },
-      { id: 11, name: 'Contas', type: 'despesa' },
-      { id: 12, name: 'Outros', type: 'despesa' }
     ];
     let userStats = {
       level: 1,
@@ -1427,17 +1421,21 @@
       // Calcula saldo acumulado (receitas - despesas não-crédito + ajustes)
       previousTransactions.forEach(t => {
         if (t.type === 'receita') {
-          accumulatedBalance += parseFloat(t.amount);
-        } else if (t.type === 'despesa') {
-          // Só desconta do saldo se não for compra no crédito (que ainda não foi paga)
-          if (t.payment_method !== 'credito') {
-            accumulatedBalance -= parseFloat(t.amount);
+          // Excluir ajustes de receita, pois serão contados separadamente
+          if (!t.description?.includes('Ajuste de saldo:')) {
+            accumulatedBalance += parseFloat(t.amount);
           }
-          // Compras no crédito NÃO descontam do saldo até a fatura ser paga
-        } else if (t.type === 'ajuste') {
-          // Ajustes são adicionados ao saldo
-          accumulatedBalance += parseFloat(t.amount);
+        } else if (t.type === 'despesa') {
+          // Excluir ajustes de despesa, pois serão contados separadamente
+          if (!t.description?.includes('Ajuste de saldo:')) {
+            // Só desconta do saldo se não for compra no crédito (que ainda não foi paga)
+            if (t.payment_method !== 'credito') {
+              accumulatedBalance -= parseFloat(t.amount);
+            }
+            // Compras no crédito NÃO descontam do saldo até a fatura ser paga
+          }
         }
+        // Ajustes serão contados no monthAdjustments do mês respectivo
       });
 
       // Se estamos visualizando um mês FUTURO, precisamos adicionar as recorrências dos meses entre hoje e o mês visualizado
@@ -1467,7 +1465,10 @@
 
       // Ajustes do mês (para cálculo de saldo)
       const monthAdjustments = monthTransactions
-        .filter(t => t.type === 'ajuste')
+        .filter(t => t.type === 'receita' && t.description?.includes('Ajuste de saldo:'))
+        .reduce((sum, t) => sum + parseFloat(t.amount), 0) -
+        monthTransactions
+        .filter(t => t.type === 'despesa' && t.description?.includes('Ajuste de saldo:'))
         .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
       // Recorrências do mês visualizado (separadas em reais e projetadas)
@@ -1477,10 +1478,10 @@
 
       // Calcula receitas REAIS do mês (incluindo recorrências que já passaram da data)
       const realIncome = monthTransactions
-        .filter(t => t.type === 'receita')
+        .filter(t => t.type === 'receita' && !t.description?.includes('Ajuste de saldo:'))
         .reduce((sum, t) => sum + parseFloat(t.amount), 0) +
         realRecurrings
-          .filter(t => t.type === 'receita')
+          .filter(t => t.type === 'receita' && !t.description?.includes('Ajuste de saldo:'))
           .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
       // Calcula despesas TOTAIS do mês (INCLUINDO crédito à vista, parcelado e recorrente)
@@ -1493,6 +1494,9 @@
           // NÃO contar pagamentos de fatura (porque já contou quando foi gasto em crédito)
           if (t.type !== 'despesa') return false;
           
+          // Excluir ajustes
+          if (t.description?.includes('Ajuste de saldo:')) return false;
+          
           // Excluir pagamentos de fatura/recorrente (são liquidações, não gastos)
           if (t.description && (t.description.includes('Pagamento Fatura') || t.description.includes('Pagamento Recorrente'))) {
             return false;
@@ -1504,6 +1508,7 @@
         realRecurrings
           .filter(t => {
             if (t.type !== 'despesa') return false;
+            if (t.description?.includes('Ajuste de saldo:')) return false;
             if (t.description && (t.description.includes('Pagamento Fatura') || t.description.includes('Pagamento Recorrente'))) {
               return false;
             }
@@ -1517,6 +1522,9 @@
       // PAGAMENTO_FATURA e PAGAMENTO_RECORRENTE: SIM, descontam porque é liquidação real
       const realExpensesForBalance = monthTransactions
         .filter(t => {
+          // Excluir ajustes
+          if (t.description?.includes('Ajuste de saldo:')) return false;
+          
           // Inclui débito, dinheiro, etc
           if (t.payment_method !== 'credito' && t.payment_method !== 'pagamento_fatura' && t.payment_method !== 'pagamento_recorrente' && t.type === 'despesa') {
             return true;
@@ -1530,6 +1538,8 @@
         .reduce((sum, t) => sum + parseFloat(t.amount), 0) +
         realRecurrings
           .filter(t => {
+            if (t.description?.includes('Ajuste de saldo:')) return false;
+            
             // Inclui débito, dinheiro, etc
             if (t.payment_method !== 'credito' && t.payment_method !== 'pagamento_fatura' && t.payment_method !== 'pagamento_recorrente' && t.type === 'despesa') {
               return true;
@@ -1835,6 +1845,7 @@
       const monthExpenses = transactions.filter(t => {
         const tDate = new Date(t.date + 'T00:00:00');
         return t.type === 'despesa' && 
+               t.category !== 'Ajuste' &&
                t.payment_method !== 'credito' &&
                tDate.getMonth() === viewMonth && 
                tDate.getFullYear() === viewYear;
@@ -5337,8 +5348,8 @@
     }
 
     function openAdjustBalanceModal() {
-      const balanceEl = document.getElementById('totalBalance');
-      const currentBalance = parseFloat(balanceEl.dataset.value) || 0;
+      // Calcular saldo atual diretamente
+      const currentBalance = calculateRealBalance();
       
       document.getElementById('currentBalanceDisplay').textContent = formatCurrency(currentBalance);
       document.getElementById('adjustBalanceInput').value = currentBalance;
@@ -5363,19 +5374,26 @@
       const newBalance = parseFloat(document.getElementById('adjustBalanceInput').value);
       
       try {
-        // Calcular saldo atual sem ajustes
-        const currentCalculatedBalance = calculateRealBalance();
-        const difference = newBalance - currentCalculatedBalance;
+        // Recarregar dados ANTES de calcular para ter dados atualizados
+        console.log('Recarregando dados antes do cálculo...');
+        await loadData();
+        console.log('Dados recarregados. Total de transações:', transactions.length);
         
-        console.log('Saldo calculado:', currentCalculatedBalance);
+        // Calcular saldo atual COM ajustes (saldo total real)
+        const currentBalance = calculateRealBalance();
+        const difference = newBalance - currentBalance;
+        
+        console.log('=== AJUSTE DE SALDO ===');
+        console.log('Saldo atual (com ajustes):', currentBalance);
         console.log('Novo saldo desejado:', newBalance);
         console.log('Diferença:', difference);
+        console.log('Vai criar ajuste?', Math.abs(difference) > 0.01);
         
         // Se há diferença, criar transação de ajuste
         if (Math.abs(difference) > 0.01) {
           const adjustmentTransaction = {
             user_id: currentUser.id,
-            type: 'ajuste',
+            type: difference > 0 ? 'receita' : 'despesa',
             description: `Ajuste de saldo: ${difference > 0 ? '+' : ''}${formatCurrency(difference)}`,
             amount: Math.abs(difference),
             category: 'Ajuste',
@@ -5395,6 +5413,8 @@
           }
           
           console.log('Transação de ajuste criada:', data);
+        } else {
+          console.log('Nenhum ajuste necessário (diferença < 0.01)');
         }
         
         showToast(`Saldo ajustado para ${formatCurrency(newBalance)}`, 'success');
@@ -5405,11 +5425,11 @@
         closeAdjustBalanceModal();
         currentViewDate = new Date();
         
-        // Processar recorrências pendentes
-        await processRecurringTransactions();
-        
+        console.log('Recarregando dados após ajuste...');
         await loadData();
+        console.log('Atualizando UI...');
         updateUI();
+        console.log('Concluído!');
       } catch (error) {
         console.error('Error adjusting balance:', error);
         showToast('Erro ao ajustar saldo. Tente novamente.', 'error');
@@ -5421,21 +5441,42 @@
 
     // Calcular saldo baseado apenas em transações reais
     function calculateRealBalance() {
-      const incomeTotal = transactions
-        .filter(t => t.type === 'receita')
-        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      console.log('Calculando saldo real...');
+      console.log('Total de transações:', transactions.length);
+      
+      const incomeTransactions = transactions.filter(t => t.type === 'receita');
+      const incomeTotal = incomeTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      console.log('Receitas:', incomeTransactions.length, 'Total:', incomeTotal);
       
       // Despesas que afetam saldo (não-crédito)
-      const expenseTotal = transactions
-        .filter(t => t.type === 'despesa' && t.payment_method !== 'credito')
-        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      const expenseTransactions = transactions.filter(t => t.type === 'despesa' && t.payment_method !== 'credito');
+      const expenseTotal = expenseTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      console.log('Despesas:', expenseTransactions.length, 'Total:', expenseTotal);
       
-      // Ajustes
-      const adjustmentTotal = transactions
-        .filter(t => t.type === 'ajuste')
-        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      const balance = incomeTotal - expenseTotal;
+      console.log('Saldo final:', balance);
+      return balance;
+    }
+
+    function calculateRealBalanceWithoutAdjustments() {
+      console.log('Calculando saldo SEM ajustes...');
       
-      return incomeTotal - expenseTotal + adjustmentTotal;
+      const incomeTransactions = transactions.filter(t => 
+        t.type === 'receita' && !t.description?.includes('Ajuste de saldo:')
+      );
+      const incomeTotal = incomeTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      console.log('Receitas (sem ajuste):', incomeTransactions.length, 'Total:', incomeTotal);
+      
+      // Despesas que afetam saldo (não-crédito)
+      const expenseTransactions = transactions.filter(t => 
+        t.type === 'despesa' && t.payment_method !== 'credito' && !t.description?.includes('Ajuste de saldo:')
+      );
+      const expenseTotal = expenseTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      console.log('Despesas (sem ajuste):', expenseTransactions.length, 'Total:', expenseTotal);
+      
+      const balance = incomeTotal - expenseTotal;
+      console.log('Saldo sem ajustes:', balance);
+      return balance;
     }
 
     // Processar recorrências e gerar transações reais
