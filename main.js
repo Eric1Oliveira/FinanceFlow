@@ -1873,10 +1873,10 @@
       container.innerHTML = sortedCategories.map(([category, amount]) => {
         const percentage = (amount / total) * 100;
         return `
-          <div class="mb-4">
+          <div class="mb-4 cursor-pointer hover:opacity-80 transition" onclick="showCategoryDetails('${category}')">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-sm">${category}</span>
-              <span class="text-sm font-bold text-green-500">${formatCurrency(amount)}</span>
+              <span class="text-sm text-red-500">${category}</span>
+              <span class="text-sm font-bold text-red-500">${formatCurrency(amount)}</span>
             </div>
             <div class="progress-bar">
               <div class="progress-fill" style="width: ${percentage}%"></div>
@@ -1884,6 +1884,67 @@
           </div>
         `;
       }).join('');
+    }
+
+
+    function showCategoryDetails(categoryName) {
+      const viewMonth = currentViewDate.getMonth();
+      const viewYear = currentViewDate.getFullYear();
+
+      // Filtrar transações da categoria neste mês
+      const categoryTransactions = transactions.filter(t => {
+        const tDate = new Date(t.date + 'T00:00:00');
+        return t.type === 'despesa' && 
+               t.category === categoryName &&
+               t.category !== 'Ajuste' &&
+               t.payment_method !== 'credito' &&
+               tDate.getMonth() === viewMonth && 
+               tDate.getFullYear() === viewYear;
+      });
+
+      const total = categoryTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      
+      // Montar HTML das transações
+      const transactionsList = categoryTransactions
+        .sort((a, b) => new Date(b.date) - new Date(a.date))
+        .map(t => {
+          const tDate = new Date(t.date + 'T00:00:00');
+          const formattedDate = tDate.toLocaleDateString('pt-BR', { weekday: 'short', month: 'short', day: 'numeric' });
+          
+          return `
+            <div class="bg-gray-700 hover:bg-gray-600 transition p-3 rounded mb-2 flex items-center justify-between">
+              <div class="flex-1">
+                <p class="font-semibold text-white text-sm">${t.description}</p>
+                <p class="text-gray-400 text-xs">${formattedDate} • ${t.payment_method}</p>
+              </div>
+              <span class="font-bold text-red-500">-${formatCurrency(t.amount)}</span>
+            </div>
+          `;
+        }).join('');
+
+      const modal = document.createElement('div');
+      modal.className = 'modal active';
+      modal.innerHTML = `
+        <div class="modal-content max-w-2xl max-h-96 overflow-y-auto">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold text-red-500">${categoryName}</h2>
+            <button onclick="this.closest('.modal').remove()" class="text-gray-400 hover:text-white text-xl">✕</button>
+          </div>
+
+          <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <p class="text-gray-400 text-sm mb-1">Total de despesas</p>
+            <p class="text-3xl font-bold text-red-500">${formatCurrency(total)}</p>
+            <p class="text-gray-400 text-xs mt-2">${categoryTransactions.length} transação${categoryTransactions.length !== 1 ? 's' : ''}</p>
+          </div>
+
+          <div>
+            <h3 class="text-lg font-bold text-white mb-3">Detalhamento</h3>
+            ${categoryTransactions.length > 0 ? transactionsList : '<p class="text-gray-400 text-center py-4">Nenhuma transação</p>'}
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
     }
 
     function renderRecentTransactions() {
@@ -5665,19 +5726,104 @@
     }
 
     async function deleteCategory(categoryId, categoryName) {
-      const confirmDiv = document.createElement('div');
-      confirmDiv.className = 'modal active';
-      confirmDiv.innerHTML = `
-        <div class="modal-content max-w-md">
-          <h3 class="text-xl font-bold mb-4 text-red-500">Excluir Categoria</h3>
-          <p class="text-gray-400 mb-6">Tem certeza que deseja excluir a categoria "<strong>${categoryName}</strong>"?</p>
-          <div class="flex gap-3">
-            <button class="btn-primary" style="background: #ef4444;" onclick="confirmDeleteCategory(${categoryId})">Sim, excluir</button>
-            <button class="btn-secondary" onclick="this.closest('.modal').remove()">Cancelar</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(confirmDiv);
+      try {
+        // Verificar se há transações com essa categoria
+        const { data: linkedTransactions, error } = await supabaseClient
+          .from('transactions')
+          .select('*')
+          .eq('category', categoryName)
+          .eq('user_id', currentUser.id);
+        
+        if (error) throw error;
+
+        // Se há transações vinculadas, forçar revinculação
+        if (linkedTransactions && linkedTransactions.length > 0) {
+          // Mostrar modal para escolher nova categoria
+          const confirmDiv = document.createElement('div');
+          confirmDiv.className = 'modal active';
+          
+          // Construir lista de categorias disponíveis (excluindo a atual)
+          const availableCategories = categories.filter(cat => cat.name !== categoryName);
+          
+          let categoryOptions = availableCategories.map(cat => 
+            `<option value="${cat.name}">${cat.name}</option>`
+          ).join('');
+          
+          confirmDiv.innerHTML = `
+            <div class="modal-content max-w-md">
+              <h3 class="text-xl font-bold mb-4 text-yellow-500">Revinculação Necessária</h3>
+              <p class="text-gray-400 mb-4">A categoria "<strong>${categoryName}</strong>" possui <strong>${linkedTransactions.length}</strong> transação(ções) vinculada(s).</p>
+              <p class="text-gray-400 mb-4">Selecione uma categoria para realocar estas transações:</p>
+              
+              <select id="newCategorySelect" class="w-full bg-gray-700 text-white border border-gray-600 rounded p-2 mb-6">
+                <option value="">-- Selecione uma categoria --</option>
+                ${categoryOptions}
+              </select>
+              
+              <div class="flex gap-3">
+                <button class="btn-primary" style="background: #10b981;" onclick="confirmRelocateAndDeleteCategory(${categoryId}, '${categoryName}')">Prosseguir</button>
+                <button class="btn-secondary" onclick="this.closest('.modal').remove()">Cancelar</button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(confirmDiv);
+        } else {
+          // Sem transações vinculadas, confirmar exclusão normalmente
+          const confirmDiv = document.createElement('div');
+          confirmDiv.className = 'modal active';
+          confirmDiv.innerHTML = `
+            <div class="modal-content max-w-md">
+              <h3 class="text-xl font-bold mb-4 text-red-500">Excluir Categoria</h3>
+              <p class="text-gray-400 mb-6">Tem certeza que deseja excluir a categoria "<strong>${categoryName}</strong>"?</p>
+              <div class="flex gap-3">
+                <button class="btn-primary" style="background: #ef4444;" onclick="confirmDeleteCategory(${categoryId})">Sim, excluir</button>
+                <button class="btn-secondary" onclick="this.closest('.modal').remove()">Cancelar</button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(confirmDiv);
+        }
+      } catch (error) {
+        console.error('Error checking category usage:', error);
+        showToast('Erro ao verificar categoria. Tente novamente.', 'error');
+      }
+    }
+
+    async function confirmRelocateAndDeleteCategory(categoryId, categoryName) {
+      try {
+        const newCategory = document.getElementById('newCategorySelect').value;
+        
+        if (!newCategory) {
+          showToast('Selecione uma categoria para realocar as transações.', 'warning');
+          return;
+        }
+
+        // Atualizar todas as transações da categoria antiga para a nova
+        const { error: updateError } = await supabaseClient
+          .from('transactions')
+          .update({ category: newCategory })
+          .eq('category', categoryName)
+          .eq('user_id', currentUser.id);
+        
+        if (updateError) throw updateError;
+
+        // Deletar a categoria
+        const { error: deleteError } = await supabaseClient
+          .from('categories')
+          .delete()
+          .eq('id', categoryId)
+          .eq('user_id', currentUser.id);
+        
+        if (deleteError) throw deleteError;
+
+        showToast(`Categoria realocada com sucesso! Transações movidas para "${newCategory}"`, 'success');
+        document.querySelector('.modal.active').remove();
+        await loadData();
+        updateUI();
+      } catch (error) {
+        console.error('Error relocating and deleting category:', error);
+        showToast('Erro ao processar a categoria. Tente novamente.', 'error');
+      }
     }
 
     async function confirmDeleteCategory(categoryId) {

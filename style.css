@@ -186,9 +186,10 @@
 
     .progress-fill {
       height: 100%;
-      background: linear-gradient(90deg, #10b981, #059669);
+      background: linear-gradient(90deg, #ef4444, #dc2626);
       transition: width 0.5s ease;
       position: relative;
+      overflow: hidden;
     }
 
     html[data-theme="light"] .progress-fill {
@@ -200,8 +201,8 @@
       position: absolute;
       top: 0;
       left: 0;
-      right: 0;
-      bottom: 0;
+      width: 100%;
+      height: 100%;
       background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
       animation: shimmer 2s infinite;
     }
