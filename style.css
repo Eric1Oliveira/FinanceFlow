@@ -1501,7 +1501,8 @@
       }
 
       #dashboardPage .month-selector,
-      #transactionsPage .month-selector {
+      #transactionsPage .month-selector,
+      #cardsPage .month-selector {
         position: fixed !important;
         top: 16px !important;
         left: 80px !important;
@@ -1516,13 +1517,15 @@
       }
 
       #dashboardPage .month-selector button,
-      #transactionsPage .month-selector button {
+      #transactionsPage .month-selector button,
+      #cardsPage .month-selector button {
         padding: 4px !important;
         flex-shrink: 0;
       }
 
       #dashboardPage .month-selector svg,
-      #transactionsPage .month-selector svg {
+      #transactionsPage .month-selector svg,
+      #cardsPage .month-selector svg {
         width: 14px !important;
         height: 14px !important;
       }
@@ -1603,7 +1606,8 @@
       }
 
       #dashboardPage .month-label,
-      #transactionsPage .month-label {
+      #transactionsPage .month-label,
+      #cardsPage .month-label {
         font-size: 11px !important;
         padding: 0 !important;
         white-space: nowrap;
@@ -1667,7 +1671,8 @@
       }
 
       #dashboardPage .month-selector,
-      #transactionsPage .month-selector {
+      #transactionsPage .month-selector,
+      #cardsPage .month-selector {
         position: relative !important;
         top: auto !important;
         right: auto !important;
@@ -1678,7 +1683,8 @@
       /* Resetar posicionamento do botão "Hoje" em desktop */
       #dashboardPage #backToCurrentBtn,
       #transactionsPage #backToCurrentBtn,
-      #transactionsPage #backToCurrentBtn2 {
+      #transactionsPage #backToCurrentBtn2,
+      #cardsPage #backToCurrentCardBtn {
         left: 50% !important;
         transform: translateX(-50%) !important;
         top: 45px!important;

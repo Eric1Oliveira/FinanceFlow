@@ -310,10 +310,29 @@
     </div><!-- Cards Page -->
     <div id="cardsPage" class="page">
      <div class="p-6">
-      <div class="flex items-center justify-between mb-6">
-       <h2 class="text-3xl font-bold">Cartões</h2><button class="btn-primary" style="width: auto;" onclick="openCardModal()">
-        <svg class="inline-block mr-2" width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-        </svg> Novo Cartão </button>
+      <div class="flex flex-col md:flex-row items-center justify-center md:justify-between mb-6 gap-4">
+       <div class="flex items-center justify-between gap-4 order-2 md:order-1 w-full md:w-auto">
+        <h2 class="text-3xl font-bold">Cartões</h2>
+        <div class="flex items-center gap-2 md:hidden"><button class="btn-primary" style="width: auto;" onclick="openCardModal()">
+          <svg class="inline-block mr-2" width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+          </svg> Novo Cartão </button>
+        </div>
+       </div>
+       <div class="relative order-1 md:order-2 w-full md:w-auto">
+        <div class="flex items-center justify-between gap-0 rounded-xl px-5 py-3 shadow-xl transition-all month-selector"><button onclick="changeCardViewMonth(-1)" class="text-gray-400 hover:text-green-400 transition-all p-2 hover:bg-green-900 hover:bg-opacity-30 rounded-lg flex-shrink-0">
+          <svg width="18" height="18" viewbox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M11 4L7 9L11 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg></button>
+         <div class="text-center flex-1">
+          <p id="cardViewMonthLabel" class="text-sm font-bold month-label"></p>
+         </div><button onclick="changeCardViewMonth(1)" class="text-gray-400 hover:text-green-400 transition-all p-2 hover:bg-green-900 hover:bg-opacity-30 rounded-lg flex-shrink-0">
+          <svg width="18" height="18" viewbox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M7 4L11 9L7 14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg></button>
+        </div><button id="backToCurrentCardBtn" onclick="backToCurrentCardMonth()" class="absolute left-1/2 -translate-x-1/2 text-xs bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded-full transition-all flex items-center shadow-lg hover:shadow-green-900 hover:scale-105 z-10" style="display: none; top: calc(100% + 2px);"> Hoje </button>
+       </div>
+       <div class="hidden md:flex items-center gap-2 order-3"><button class="btn-primary" style="width: auto;" onclick="openCardModal()">
+         <svg class="inline-block mr-2" width="16" height="16" viewbox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8 3V13M3 8H13" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+         </svg> Novo Cartão </button>
+       </div>
       </div>
       <div id="cardsList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
      </div>

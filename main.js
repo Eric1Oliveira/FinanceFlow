@@ -26,12 +26,14 @@
     let goals = [];
     let recurringTransactions = [];
     let currentViewDate = new Date();
+    let cardViewDate = new Date();
     let currentPage = 'dashboard'; // Rastreia a página atual
     let achievementsPage = 0; // Página atual de conquistas
     let banks = []; // Instituições financeiras
     let cdiRate = 0; // Taxa CDI anual
     let chartGranularity = 'month'; // Granularidade do gráfico: 'day', 'month', 'year'
     let lastSimulationParams = {}; // Armazenar últimos parâmetros da simulação
+    let cardInvoiceAdjustments = {}; // Armazenar ajustes de fatura por cartão e mês
     let categories = [
       { id: 1, name: 'Salário', type: 'receita' },
       { id: 2, name: 'Freelance', type: 'receita' },
@@ -525,7 +527,8 @@
         // Se for o mês de início, cria a transação independente do dia
         // Se não for o mês de início, só cria se já passou do dia recorrente
         if (isStartMonth || currentDay >= recurring.day_of_month) {
-          const transactionDate = new Date(currentYear, currentMonth, recurring.day_of_month);
+          // Ajusta o dia para o último dia do mês se o dia solicitado não existir
+          const transactionDate = getValidDateForRecurring(currentYear, currentMonth, recurring.day_of_month);
           const dateString = transactionDate.toISOString().split('T')[0];
           
           const existingTransaction = transactions.find(t => 
@@ -565,6 +568,19 @@
       }
     }
 
+    function getValidDateForRecurring(year, month, day) {
+      // Cria a data com o dia solicitado
+      const date = new Date(year, month, day);
+      
+      // Verifica se o dia ficou diferente (significa que o dia não existe nesse mês)
+      if (date.getDate() !== day) {
+        // Pega o último dia do mês (voltando um dia do mês seguinte)
+        date.setDate(0);
+      }
+      
+      return date;
+    }
+
     function getProjectedRecurringTransactions(month, year) {
       const projectedTransactions = [];
       const today = new Date();
@@ -598,7 +614,7 @@
           }
         }
 
-        const transactionDate = new Date(year, month, recurring.day_of_month);
+        const transactionDate = getValidDateForRecurring(year, month, recurring.day_of_month);
         const dateString = transactionDate.toISOString().split('T')[0];
 
         // NÃO mostrar como projeção se for o mês de início da recorrente
@@ -1342,6 +1358,7 @@
       renderRecentTransactions();
       updateCardSelectionOptions();
       updateCategoryOptions();
+      updateCardViewMonth();
     }
 
     // Função para animar números subindo ou descendo
@@ -1677,14 +1694,12 @@
       }
     }
 
-    function calculateCardUsage(cardId) {
+    function calculateCardUsage(cardId, viewDate = null) {
       const card = cards.find(c => c.id === cardId);
       if (!card) return 0;
 
-      const today = new Date();
+      const today = viewDate || new Date();
       today.setHours(0, 0, 0, 0);
-      const currentMonth = today.getMonth();
-      const currentYear = today.getFullYear();
 
       let blockedLimit = 0;
 
@@ -1712,40 +1727,25 @@
         blockedLimit += group.totalAmount;
       });
 
-      // 2. RECORRENTES NO CRÉDITO
-      // Bloqueiam APENAS o valor do mês atual (não bloqueiam recorrências futuras)
-      const projectedRecurrings = getProjectedRecurringTransactions(currentMonth, currentYear);
-      const recurringBlockage = projectedRecurrings
+      // 2. FATURAS DE TODOS OS MESES (calculadas com ajustes)
+      // Calcular fatura para cada mês e somar todas
+      const allMonthsTotal = calculateAllMonthsInvoiceTotal(cardId);
+      blockedLimit = Math.max(blockedLimit, allMonthsTotal);
+
+      // 3. SUBTRAIR PAGAMENTOS JÁ REALIZADOS (em qualquer mês)
+      const paymentPattern = `Pagamento Fatura - ${card.name}`;
+      const allPayments = transactions
         .filter(t => {
-          if (t.card_id !== cardId || t.type !== 'despesa' || t.payment_method !== 'credito') {
+          if (!t.description || !t.description.includes(paymentPattern)) {
             return false;
           }
-          
-          // Só bloqueia se for do mês atual (não bloqueia recorrências futuras)
-          const tDate = new Date(t.date + 'T00:00:00');
-          return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
+          return true;
         })
         .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
-      blockedLimit += recurringBlockage;
-
-      // 3. SUBTRAIR PAGAMENTOS JÁ REALIZADOS NO MÊS ATUAL
-      // Reduz o bloqueio conforme os pagamentos são feitos
-      // Procura pela descrição "Pagamento Fatura" em vez do payment_method
-      const paymentsThisMonth = transactions
-        .filter(t => {
-          if (!t.description || !t.description.includes(`Pagamento Fatura - ${card.name}`)) {
-            return false;
-          }
-          
-          const tDate = new Date(t.date + 'T00:00:00');
-          return tDate.getMonth() === currentMonth && tDate.getFullYear() === currentYear;
-        })
-        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
-
-      blockedLimit -= paymentsThisMonth;
+      blockedLimit -= allPayments;
       
-      console.log(`💳 ${card.name}: Bloqueado=${blockedLimit + paymentsThisMonth}, Pagamentos=${paymentsThisMonth}, Disponível=${Math.max(0, blockedLimit)}`);
+      console.log(`💳 ${card.name}: Bloqueado=${blockedLimit + allPayments}, Pagamentos=${allPayments}, Disponível=${Math.max(0, blockedLimit)}`);
       
       // Garantir que não fica negativo
       blockedLimit = Math.max(0, blockedLimit);
@@ -1753,11 +1753,59 @@
       return blockedLimit;
     }
 
-    function calculateCurrentMonthInvoice(cardId) {
+    function calculateAllMonthsInvoiceTotal(cardId) {
       const card = cards.find(c => c.id === cardId);
       if (!card) return 0;
 
+      let totalInvoice = 0;
+
+      // Calcular fatura para os últimos 12 meses (e futuros próximos 12)
       const now = new Date();
+      for (let i = -12; i <= 12; i++) {
+        const checkDate = new Date(now.getFullYear(), now.getMonth() + i, 1);
+        const monthKey = checkDate.getFullYear() + '-' + String(checkDate.getMonth() + 1).padStart(2, '0');
+        const adjustmentKey = `${cardId}_${monthKey}`;
+
+        // Verificar se há ajuste manual para este mês
+        if (cardInvoiceAdjustments[adjustmentKey] !== undefined) {
+          // Usar o valor ajustado
+          totalInvoice += cardInvoiceAdjustments[adjustmentKey];
+        } else {
+          // Calcular normalmente
+          // Transações de crédito do mês
+          const monthTransactions = transactions
+            .filter(t => {
+              if (t.card_id !== cardId || t.type !== 'despesa' || t.payment_method !== 'credito') {
+                return false;
+              }
+              
+              const tDate = new Date(t.date + 'T00:00:00');
+              return tDate.getMonth() === checkDate.getMonth() && 
+                     tDate.getFullYear() === checkDate.getFullYear();
+            })
+            .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+
+          // Recorrentes projetadas para o mês
+          const projectedRecurrings = getProjectedRecurringTransactions(checkDate.getMonth(), checkDate.getFullYear());
+          const recurringAmount = projectedRecurrings
+            .filter(t => t.card_id === cardId && t.type === 'despesa' && t.payment_method === 'credito')
+            .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+
+          const monthTotal = monthTransactions + recurringAmount;
+          if (monthTotal > 0) {
+            totalInvoice += monthTotal;
+          }
+        }
+      }
+
+      return Math.max(0, totalInvoice);
+    }
+
+    function calculateCurrentMonthInvoice(cardId, viewDate = null) {
+      const card = cards.find(c => c.id === cardId);
+      if (!card) return 0;
+
+      const now = viewDate || new Date();
       
       // Transações reais do cartão
       const realTransactions = transactions
@@ -1791,11 +1839,18 @@
         })
         .reduce((sum, t) => sum + parseFloat(t.amount), 0);
       
-      const totalInvoice = realTransactions + recurringTransactions - paymentsThisMonth;
+      let totalInvoice = realTransactions + recurringTransactions - paymentsThisMonth;
       
-      // Debug
-      if (paymentsThisMonth > 0 || realTransactions > 0 || recurringTransactions > 0) {
-        console.log(`📊 Fatura ${card.name}: Real=${realTransactions}, Recorrente=${recurringTransactions}, Pagamentos=${paymentsThisMonth}, Total=${totalInvoice}`);
+      // Verificar se há ajuste manual de fatura
+      const adjustmentKey = `${cardId}_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+      if (cardInvoiceAdjustments[adjustmentKey] !== undefined) {
+        totalInvoice = cardInvoiceAdjustments[adjustmentKey];
+        console.log(`📊 Fatura ${card.name}: Usando valor ajustado=${totalInvoice}`);
+      } else {
+        // Debug
+        if (paymentsThisMonth > 0 || realTransactions > 0 || recurringTransactions > 0) {
+          console.log(`📊 Fatura ${card.name}: Real=${realTransactions}, Recorrente=${recurringTransactions}, Pagamentos=${paymentsThisMonth}, Total=${totalInvoice}`);
+        }
       }
       
       // Garantir que não fica negativo
@@ -2194,10 +2249,11 @@
     }
 
     function renderCreditCard(card) {
-      const used = calculateCardUsage(card.id);
-      const currentMonthInvoice = calculateCurrentMonthInvoice(card.id);
-      const available = card.credit_limit - used;
-      const usagePercent = (used / card.credit_limit) * 100;
+      const used = calculateCardUsage(card.id, cardViewDate);
+      const currentMonthInvoice = calculateCurrentMonthInvoice(card.id, cardViewDate); // Fatura do mês visualizado
+      const totalOpenInvoices = calculateAllMonthsInvoiceTotal(card.id); // Soma de TODAS as faturas em aberto
+      const available = card.credit_limit - totalOpenInvoices; // Limite disponível sempre usa TODOS os meses
+      const usagePercent = (totalOpenInvoices / card.credit_limit) * 100; // Percentual baseado em TODAS as faturas
       const futureInvoices = calculateFutureInvoices(card.id);
 
       return `
@@ -2690,6 +2746,37 @@
     function backToCurrentMonth() {
       currentViewDate = new Date();
       updateUI();
+    }
+
+    function changeCardViewMonth(delta) {
+      cardViewDate = new Date(cardViewDate.getFullYear(), cardViewDate.getMonth() + delta, 1);
+      updateCardViewMonth();
+    }
+
+    function backToCurrentCardMonth() {
+      cardViewDate = new Date();
+      updateCardViewMonth();
+    }
+
+    function updateCardViewMonth() {
+      const now = new Date();
+      const isCurrentMonth = cardViewDate.getMonth() === now.getMonth() && 
+                             cardViewDate.getFullYear() === now.getFullYear();
+      
+      const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 
+                          'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+      
+      const monthLabel = `${monthNames[cardViewDate.getMonth()]} ${cardViewDate.getFullYear()}`;
+
+      const cardLabel = document.getElementById('cardViewMonthLabel');
+      if (cardLabel) cardLabel.textContent = monthLabel;
+
+      const backBtn = document.getElementById('backToCurrentCardBtn');
+      if (backBtn) {
+        backBtn.style.display = isCurrentMonth ? 'none' : 'flex';
+      }
+
+      renderCards();
     }
 
     function updateMonthLabels() {
@@ -5915,7 +6002,7 @@
             <p class="text-2xl font-bold text-yellow-400">${formatCurrency(currentAmount)}</p>
           </div>
 
-          <form onsubmit="saveAdjustInvoice(event, ${cardId}, ${currentAmount})" class="space-y-4">
+          <form onsubmit="saveAdjustInvoice(event, ${cardId})" class="space-y-4">
             <div>
               <label class="block text-sm font-semibold mb-2">Novo Valor</label>
               <input type="number" id="adjustedAmount" name="amount" placeholder="0,00" step="0.01" value="${currentAmount}" required class="w-full" />
@@ -5923,7 +6010,7 @@
 
             <div class="text-sm text-gray-400 p-3 bg-gray-900 rounded-lg">
               <p class="mb-2">💡 Diferença: <span id="difference" class="font-bold text-yellow-400">${formatCurrency(0)}</span></p>
-              <small>Se aumentar: será adicionado à fatura<br/>Se diminuir: será removido da fatura</small>
+              <small>A fatura será ajustada para o valor exato informado acima</small>
             </div>
 
             <div class="flex gap-3 pt-4">
@@ -5947,61 +6034,129 @@
       });
     }
 
-    async function saveAdjustInvoice(e, cardId, currentAmount) {
+    async function saveAdjustInvoice(e, cardId) {
       e.preventDefault();
 
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      if (submitBtn.disabled) return;
+      
+      submitBtn.disabled = true;
+      const originalText = submitBtn.textContent;
+      submitBtn.textContent = 'Ajustando...';
+
       const newAmount = parseFloat(document.getElementById('adjustedAmount').value) || 0;
-      const difference = newAmount - currentAmount;
-
-      if (difference === 0) {
-        showToast('⚠️ Nenhuma alteração no valor da fatura', 'error');
-        return;
-      }
-
-      const card = cards.find(c => c.id === cardId);
-      if (!card) {
-        showToast('❌ Cartão não encontrado', 'error');
-        return;
-      }
-
-      const now = new Date();
 
       try {
-        // Criar transação de ajuste da fatura
-        const adjustmentData = {
-          type: 'despesa',
-          description: difference > 0 
-            ? `Ajuste Fatura ${card.name} (+${formatCurrency(difference)})`
-            : `Ajuste Fatura ${card.name} (${formatCurrency(difference)})`,
-          amount: Math.abs(difference),
-          category: 'Contas',
-          date: now.toISOString().split('T')[0],
-          payment_method: difference > 0 ? 'credito' : 'ajuste',
-          card_id: difference > 0 ? cardId : null,
-          installments: 1,
-          current_installment: 1,
-          user_id: currentUser.id
-        };
+        const card = cards.find(c => c.id === cardId);
+        if (!card) {
+          showToast('❌ Cartão não encontrado', 'error');
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+          return;
+        }
 
-        console.log('Salvando ajuste de fatura:', adjustmentData);
+        const viewDate = cardViewDate || new Date();
+        const today = new Date();
+        const dateStr = `${viewDate.getFullYear()}-${String(viewDate.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-        const { error } = await supabaseClient.from('transactions').insert([adjustmentData]);
+        // Calcular fatura ANTES de qualquer ajuste (real, sem o cardInvoiceAdjustments anterior)
+        // Remover temporariamente o ajuste anterior para calcular a fatura base
+        const adjustmentKey = `${cardId}_${viewDate.getFullYear()}-${String(viewDate.getMonth() + 1).padStart(2, '0')}`;
+        const previousAdjustment = cardInvoiceAdjustments[adjustmentKey];
+        delete cardInvoiceAdjustments[adjustmentKey];
         
-        if (error) throw error;
-
-        showToast(`✅ Fatura ajustada para ${formatCurrency(newAmount)}`, 'success');
+        const baseInvoice = calculateCurrentMonthInvoice(cardId, viewDate);
         
+        // Restaurar o ajuste anterior temporariamente
+        if (previousAdjustment !== undefined) {
+          cardInvoiceAdjustments[adjustmentKey] = previousAdjustment;
+        }
+
+        // Calcular diferença entre o novo valor e a fatura base (sem ajustes)
+        const difference = newAmount - baseInvoice;
+
+        // REMOVER AJUSTES ANTERIORES do mesmo mês e cartão
+        // Procurar por todas as transações de ajuste deste cartão neste mês
+        const adjustmentTransactions = transactions.filter(t => 
+          t.card_id === cardId &&
+          t.description === `Ajuste de Fatura - ${card.name}` &&
+          t.date.startsWith(viewDate.getFullYear() + '-' + String(viewDate.getMonth() + 1).padStart(2, '0'))
+        );
+
+        // Remover todas as transações de ajuste anteriores
+        adjustmentTransactions.forEach(t => {
+          const index = transactions.indexOf(t);
+          if (index > -1) {
+            transactions.splice(index, 1);
+          }
+
+          // Tentar remover do Supabase também
+          try {
+            supabaseClient.from('transactions').delete().eq('id', t.id).catch(() => {});
+          } catch (dbError) {
+            console.warn('Erro ao remover ajuste anterior:', dbError);
+          }
+        });
+
+        // Criar NOVA transação de ajuste com a diferença correta
+        if (Math.abs(difference) > 0.01) {
+          const adjustmentTransaction = {
+            id: Date.now(),
+            user_id: currentUser?.id || 'temp',
+            type: difference > 0 ? 'despesa' : 'receita',
+            description: `Ajuste de Fatura - ${card.name}`,
+            amount: Math.abs(difference),
+            date: dateStr,
+            category: 'Ajuste',
+            payment_method: 'credito',
+            card_id: cardId,
+            installments: 1,
+            created_at: new Date().toISOString()
+          };
+
+          // Adicionar à lista de transações
+          transactions.push(adjustmentTransaction);
+
+          // Salvar no Supabase
+          try {
+            const { error: insertError } = await supabaseClient
+              .from('transactions')
+              .insert([adjustmentTransaction]);
+
+            if (insertError) {
+              console.warn('Erro ao salvar ajuste no banco:', insertError);
+            }
+          } catch (dbError) {
+            console.warn('Erro na comunicação com banco:', dbError);
+          }
+        }
+
+        // Salvar novo ajuste em memória
+        cardInvoiceAdjustments[adjustmentKey] = newAmount;
+
+        console.log('=== AJUSTE DE FATURA ===');
+        console.log('Cartão:', card.name);
+        console.log('Fatura base:', baseInvoice);
+        console.log('Novo valor:', newAmount);
+        console.log('Diferença:', difference);
+        console.log('Transações anteriores removidas:', adjustmentTransactions.length);
+
         // Fechar modal
         const modal = document.querySelector('.modal.active');
         if (modal) modal.remove();
-        
-        // Recarregar dados
-        await loadData();
+
+        // Atualizar UI
         updateUI();
+        showToast(`✅ Fatura ajustada para ${formatCurrency(newAmount)}`, 'success');
+        
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
         
       } catch (error) {
         console.error('Error adjusting invoice:', error);
         showToast(`❌ Erro ao ajustar fatura: ${error.message}`, 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
       }
     }
 
