@@ -1761,6 +1761,9 @@
 
       // Calcular fatura para os últimos 12 meses (e futuros próximos 12)
       const now = new Date();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
       for (let i = -12; i <= 12; i++) {
         const checkDate = new Date(now.getFullYear(), now.getMonth() + i, 1);
         const monthKey = checkDate.getFullYear() + '-' + String(checkDate.getMonth() + 1).padStart(2, '0');
@@ -1785,11 +1788,23 @@
             })
             .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
-          // Recorrentes projetadas para o mês
-          const projectedRecurrings = getProjectedRecurringTransactions(checkDate.getMonth(), checkDate.getFullYear());
-          const recurringAmount = projectedRecurrings
-            .filter(t => t.card_id === cardId && t.type === 'despesa' && t.payment_method === 'credito')
-            .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+          // RECORRENTES APENAS DO MÊS ATUAL
+          // Em qualquer outro mês (passado ou futuro), NÃO contar recorrentes
+          let recurringAmount = 0;
+          const isCurrentMonth = checkDate.getMonth() === currentMonth && checkDate.getFullYear() === currentYear;
+          
+          if (isCurrentMonth) {
+            // APENAS no mês atual, contar TODAS as recorrentes
+            const projectedRecurrings = getProjectedRecurringTransactions(checkDate.getMonth(), checkDate.getFullYear());
+            recurringAmount = projectedRecurrings
+              .filter(t => {
+                return t.card_id === cardId && 
+                       t.type === 'despesa' && 
+                       t.payment_method === 'credito';
+              })
+              .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+          }
+          // Se NÃO é mês atual, recurringAmount permanece 0
 
           const monthTotal = monthTransactions + recurringAmount;
           if (monthTotal > 0) {
@@ -1806,6 +1821,11 @@
       if (!card) return 0;
 
       const now = viewDate || new Date();
+      const today = new Date(); // Sempre pega a data de hoje para comparar
+      
+      // Verificar se o mês sendo visualizado é o MÊS ATUAL
+      const isCurrentMonth = now.getMonth() === today.getMonth() && 
+                             now.getFullYear() === today.getFullYear();
       
       // Transações reais do cartão
       const realTransactions = transactions
@@ -1820,13 +1840,22 @@
         })
         .reduce((sum, t) => sum + parseFloat(t.amount), 0);
       
-      // Recorrentes projetadas para o mês atual
-      const projectedRecurrings = getProjectedRecurringTransactions(now.getMonth(), now.getFullYear());
-      const recurringTransactions = projectedRecurrings
-        .filter(t => t.card_id === cardId && t.type === 'despesa' && t.payment_method === 'credito')
-        .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      // Recorrentes APENAS se estiver visualizando o mês atual
+      // Em meses futuros ou passados, recorrentes NÃO aparecem na fatura
+      let recurringTransactions = 0;
+      if (isCurrentMonth) {
+        const projectedRecurrings = getProjectedRecurringTransactions(now.getMonth(), now.getFullYear());
+        // TODAS as recorrentes do mês atual
+        recurringTransactions = projectedRecurrings
+          .filter(t => {
+            return t.card_id === cardId && 
+                   t.type === 'despesa' && 
+                   t.payment_method === 'credito';
+          })
+          .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      }
       
-      // Subtrair pagamentos já feitos no mês atual (procura pela descrição que começa com "Pagamento Fatura")
+      // Subtrair pagamentos já feitos no mês (procura pela descrição que começa com "Pagamento Fatura")
       const paymentPattern = `Pagamento Fatura - ${card.name}`;
       const paymentsThisMonth = transactions
         .filter(t => {
@@ -2188,31 +2217,8 @@
           invoice.installments.push(t);
         });
       
-      // Adicionar recorrentes projetadas para os próximos 12 meses
-      for (let i = 1; i <= 12; i++) {
-        const futureMonth = new Date(now.getFullYear(), now.getMonth() + i, 1);
-        const projectedRecurrings = getProjectedRecurringTransactions(futureMonth.getMonth(), futureMonth.getFullYear());
-        
-        projectedRecurrings
-          .filter(t => t.card_id === cardId && t.type === 'despesa' && t.payment_method === 'credito')
-          .forEach(t => {
-            const installmentDate = new Date(t.date + 'T00:00:00');
-            const monthKey = `${installmentDate.getFullYear()}-${installmentDate.getMonth()}`;
-            
-            if (!futureInvoices.has(monthKey)) {
-              futureInvoices.set(monthKey, {
-                month: installmentDate.getMonth(),
-                year: installmentDate.getFullYear(),
-                amount: 0,
-                installments: []
-              });
-            }
-            
-            const invoice = futureInvoices.get(monthKey);
-            invoice.amount += parseFloat(t.amount);
-            invoice.installments.push(t);
-          });
-      }
+      // NÃO adicionar recorrentes nas próximas faturas
+      // Recorrentes no crédito só contam no mês atual, nunca em meses futuros
 
       return Array.from(futureInvoices.values()).sort((a, b) => {
         if (a.year !== b.year) return a.year - b.year;
@@ -2496,6 +2502,26 @@
       }).join('');
     }
 
+    function changeMonth(delta) {
+      currentViewDate = new Date(currentViewDate.getFullYear(), currentViewDate.getMonth() + delta, 1);
+      updateUI();
+    }
+
+    function backToCurrentMonth() {
+      currentViewDate = new Date();
+      updateUI();
+    }
+
+    function changeCardViewMonth(delta) {
+      cardViewDate = new Date(cardViewDate.getFullYear(), cardViewDate.getMonth() + delta, 1);
+      updateCardViewMonth();
+    }
+
+    function backToCurrentCardMonth() {
+      cardViewDate = new Date();
+      updateCardViewMonth();
+    }
+
     function renderAchievements() {
       const container = document.getElementById('achievementsList');
       const parentContainer = document.getElementById('achievementsContainer');
@@ -2707,7 +2733,7 @@
         { id: 19, name: 'Visionário', description: 'Crie 10 metas diferentes', unlocked: goals.length >= 10, icon: '👁️', rarity: 'épico', color: 'from-indigo-600 to-purple-700' },
         { id: 20, name: 'Lenda Financeira', description: 'Desbloqueie todas as conquistas', unlocked: false, icon: '👑', rarity: 'épico', color: 'from-orange-500 to-red-600' }
       ];
-      const itemsPerPage = 12;
+      const itemsPerPage = 8;
       const totalPages = Math.ceil(achievements.length / itemsPerPage);
       if (achievementsPage < totalPages - 1) {
         achievementsPage++;
@@ -2736,26 +2762,6 @@
       const expenses = monthTransactions.filter(t => t.type === 'despesa' && t.payment_method !== 'credito').reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
       return income > expenses;
-    }
-
-    function changeMonth(delta) {
-      currentViewDate = new Date(currentViewDate.getFullYear(), currentViewDate.getMonth() + delta, 1);
-      updateUI();
-    }
-
-    function backToCurrentMonth() {
-      currentViewDate = new Date();
-      updateUI();
-    }
-
-    function changeCardViewMonth(delta) {
-      cardViewDate = new Date(cardViewDate.getFullYear(), cardViewDate.getMonth() + delta, 1);
-      updateCardViewMonth();
-    }
-
-    function backToCurrentCardMonth() {
-      cardViewDate = new Date();
-      updateCardViewMonth();
     }
 
     function updateCardViewMonth() {
