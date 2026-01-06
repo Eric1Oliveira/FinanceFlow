@@ -98,21 +98,26 @@
         if (error) throw error;
         
         isCurrentUserAdmin = data?.is_admin || false;
-        const themeBtn = document.getElementById('themeToggleBtn');
         
-        if (themeBtn) {
-          if (isCurrentUserAdmin) {
-            themeBtn.style.display = 'flex';
-          } else {
-            themeBtn.style.display = 'none';
-          }
+        // Ocultar XP e Conquistas para usuários não-ADM
+        const xpSection = document.querySelector('.xp-section');
+        const achievementsMenuItem = document.querySelector('.achievements-menu-item');
+        
+        if (!isCurrentUserAdmin) {
+            if (xpSection) xpSection.style.display = 'none';
+            if (achievementsMenuItem) achievementsMenuItem.style.display = 'none';
+        } else {
+            if (xpSection) xpSection.style.display = 'flex';
+            if (achievementsMenuItem) achievementsMenuItem.style.display = 'flex';
         }
       } catch (error) {
         console.error('Erro ao verificar status de admin:', error);
         isCurrentUserAdmin = false;
-        // Esconder botão de tema se houver erro
-        const themeBtn = document.getElementById('themeToggleBtn');
-        if (themeBtn) themeBtn.style.display = 'none';
+        // Esconder XP e Conquistas se houver erro
+        const xpSection = document.querySelector('.xp-section');
+        const achievementsMenuItem = document.querySelector('.achievements-menu-item');
+        if (xpSection) xpSection.style.display = 'none';
+        if (achievementsMenuItem) achievementsMenuItem.style.display = 'none';
       }
     }
 
@@ -250,7 +255,7 @@
         document.getElementById('app').classList.remove('hidden');
         
         updateUserProfileName();
-        setTheme('light');
+        setTheme('dark');
         await loadData();
         navigateTo('dashboard');
         setDefaultDate();
@@ -1675,6 +1680,11 @@
     }
 
     function updateLevelDisplay() {
+      // Verificar se é ADM antes de atualizar XP
+      if (!isCurrentUserAdmin) {
+        return;
+      }
+      
       const currentLevelXP = userStats.xp % 100;
       const progress = (currentLevelXP / 100) * 100;
 
@@ -2523,6 +2533,15 @@
     }
 
     function renderAchievements() {
+      // Verificar se é ADM antes de renderizar conquistas
+      if (!isCurrentUserAdmin) {
+        const container = document.getElementById('achievementsList');
+        if (container) {
+          container.innerHTML = '<div class="text-center text-gray-400 py-8">Apenas administradores têm acesso às conquistas.</div>';
+        }
+        return;
+      }
+      
       const container = document.getElementById('achievementsList');
       const parentContainer = document.getElementById('achievementsContainer');
 
@@ -6475,8 +6494,8 @@
 
     // SISTEMA DE TEMAS
     function initTheme() {
-      const savedTheme = localStorage.getItem('appTheme') || 'light';
-      setTheme(savedTheme);
+      const savedTheme = localStorage.getItem('appTheme') || 'dark';
+      setTheme('dark');
     }
 
     function setTheme(theme) {
@@ -6538,18 +6557,6 @@
       }
       
       updateThemeToggleIcon();
-    }
-
-    function toggleTheme() {
-      // Verificar se o usuário é admin antes de permitir mudança de tema
-      if (!isCurrentUserAdmin) {
-        showToast('Apenas administradores podem usar o Modo Turbo.', 'error');
-        return;
-      }
-      
-      const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      setTheme(newTheme);
     }
 
     function updateThemeToggleIcon() {
