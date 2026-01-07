@@ -1687,7 +1687,7 @@
       #cardsPage #backToCurrentCardBtn {
         left: 50% !important;
         transform: translateX(-50%) !important;
-        top: 45px!important;
+        top: 50px!important;
         position: absolute !important;
       }
     }
@@ -2214,20 +2214,22 @@
       /* Centralizar botão "Hoje" em relação ao seletor em mobile - bem grudado */
       #dashboardPage #backToCurrentBtn,
       #transactionsPage #backToCurrentBtn,
-      #transactionsPage #backToCurrentBtn2 {
+      #transactionsPage #backToCurrentBtn2,
+      #cardsPage #backToCurrentCardBtn {
         left: 190px !important;
         transform: translateX(-66%) !important;
-        top: -30px!important;
+        top: -25px!important;
         position: absolute !important;
         z-index: 50 !important;
       }
 
-      #transactionsPage #backToCurrentBtn2 {
-        left: 59% !important;
+      #transactionsPage #backToCurrentBtn2
+      #cardsPage #backToCurrentCardBtn {
+        left: 48% !important;
         z-index: 50 !important;
         transform: translateX(-50%) !important;
         bottom: auto !important;
-        top: 40px !important;
+        top: 48px !important;
         position: fixed !important;
       }
 
