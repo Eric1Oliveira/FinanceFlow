@@ -1437,7 +1437,15 @@
       const previousTransactions = transactions.filter(t => {
         const tDate = new Date(t.date + 'T00:00:00');
         const transactionMonthKey = tDate.getFullYear() * 12 + tDate.getMonth();
-        return transactionMonthKey < viewMonthKey;
+        
+        if (transactionMonthKey >= viewMonthKey) return false;
+        
+        // Para meses passados, incluir apenas transações que já chegaram (todas, pois são do passado)
+        if (tDate <= today) {
+          return true;
+        }
+        
+        return false;
       });
 
       // Calcula saldo acumulado (receitas - despesas não-crédito + ajustes)
@@ -1479,10 +1487,22 @@
         }
       }
 
-      // Transações REAIS do mês visualizado
-      const monthTransactions = transactions.filter(t => {
+      // Transações REAIS do mês visualizado (TODAS)
+      const allMonthTransactions = transactions.filter(t => {
         const tDate = new Date(t.date + 'T00:00:00');
         return tDate.getMonth() === viewMonth && tDate.getFullYear() === viewYear;
+      });
+
+      // Transações REAIS do mês visualizado (apenas as que já chegaram - para saldo)
+      const monthTransactions = allMonthTransactions.filter(t => {
+        const tDate = new Date(t.date + 'T00:00:00');
+        
+        // Se estamos visualizando o mês ATUAL, considerar apenas transações que já chegaram
+        if (isCurrentMonth && tDate > today) {
+          return false; // Não contar transações futuras do mês atual para saldo
+        }
+        
+        return true;
       });
 
       // Ajustes do mês (para cálculo de saldo)
@@ -1495,11 +1515,52 @@
 
       // Recorrências do mês visualizado (separadas em reais e projetadas)
       const projectedRecurrings = getProjectedRecurringTransactions(viewMonth, viewYear);
-      const realRecurrings = projectedRecurrings.filter(t => !t.is_projected);
-      const futureRecurrings = projectedRecurrings.filter(t => t.is_projected);
+      
+      // Filtrar recorrências que já chegaram na data
+      let realRecurrings = projectedRecurrings.filter(t => !t.is_projected);
+      let futureRecurrings = projectedRecurrings.filter(t => t.is_projected);
+      
+      // Se estamos visualizando o mês ATUAL, remover recorrências futuras de realRecurrings
+      if (isCurrentMonth) {
+        const recurringsThatAreFuture = realRecurrings.filter(t => {
+          const tDate = new Date(t.date + 'T00:00:00');
+          return tDate > today;
+        });
+        
+        realRecurrings = realRecurrings.filter(t => {
+          const tDate = new Date(t.date + 'T00:00:00');
+          return tDate <= today;
+        });
+        
+        // Adicionar às futuras
+        futureRecurrings = futureRecurrings.concat(recurringsThatAreFuture);
+      }
 
-      // Calcula receitas REAIS do mês (incluindo recorrências que já passaram da data)
-      const realIncome = monthTransactions
+      // Calcular projeções de recorrências para QUALQUER mês
+      let projectedIncome = 0;
+      let projectedExpensesTotal = 0;
+      let projectedExpensesForBalance = 0;
+      let hasProjections = futureRecurrings.length > 0;
+
+      if (hasProjections) {
+        projectedIncome = futureRecurrings
+          .filter(t => t.type === 'receita')
+          .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+
+        // Todas as despesas projetadas (incluindo crédito)
+        projectedExpensesTotal = futureRecurrings
+          .filter(t => t.type === 'despesa')
+          .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+
+        // Despesas projetadas que afetam saldo (sem crédito)
+        projectedExpensesForBalance = futureRecurrings
+          .filter(t => t.type === 'despesa' && t.payment_method !== 'credito')
+          .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      }
+
+      // Calcula receitas REAIS do mês (incluindo recorrências que já chegaram)
+      // NÃO inclui projeções aqui - elas são adicionadas depois só para exibição
+      const realIncome = allMonthTransactions
         .filter(t => t.type === 'receita' && !t.description?.includes('Ajuste de saldo:'))
         .reduce((sum, t) => sum + parseFloat(t.amount), 0) +
         realRecurrings
@@ -1510,7 +1571,9 @@
       // NÃO inclui pagamentos (pagamento_fatura, debito, dinheiro que são pagamentos)
       // porque pagamento não é consumo/despesa, é apenas liquidação de dívida
       // Para evitar contagem dupla: ou conta o gasto EM CRÉDITO ou quando paga, nunca os dois
-      const realExpensesTotal = monthTransactions
+      // Usa allMonthTransactions para incluir transações futuras do mês
+      // NÃO inclui projeções aqui - elas são adicionadas depois só para exibição
+      const realExpensesTotal = allMonthTransactions
         .filter(t => {
           // Contar APENAS despesas reais: crédito, débito, dinheiro
           // NÃO contar pagamentos de fatura (porque já contou quando foi gasto em crédito)
@@ -1580,31 +1643,6 @@
       
       // Saldo agora é APENAS baseado em transações reais (incluindo ajustes)
       // Os ajustes foram somados acima em accumulatedBalance e monthAdjustments
-
-      // Para o mês ATUAL ou FUTURO, mostra projeções SEPARADAMENTE (apenas futuras)
-      let projectedIncome = 0;
-      let projectedExpensesTotal = 0;
-      let projectedExpensesForBalance = 0;
-      let hasProjections = false;
-
-      // Calcular projeções de recorrências para QUALQUER mês
-      hasProjections = futureRecurrings.length > 0;
-
-      if (hasProjections) {
-        projectedIncome = futureRecurrings
-          .filter(t => t.type === 'receita')
-          .reduce((sum, t) => sum + parseFloat(t.amount), 0);
-
-        // Todas as despesas projetadas (incluindo crédito)
-        projectedExpensesTotal = futureRecurrings
-          .filter(t => t.type === 'despesa')
-          .reduce((sum, t) => sum + parseFloat(t.amount), 0);
-
-        // Despesas projetadas que afetam saldo (sem crédito)
-        projectedExpensesForBalance = futureRecurrings
-          .filter(t => t.type === 'despesa' && t.payment_method !== 'credito')
-          .reduce((sum, t) => sum + parseFloat(t.amount), 0);
-      }
 
       const balanceEl = document.getElementById('totalBalance');
       const incomeEl = document.getElementById('monthIncome');
@@ -1718,9 +1756,15 @@
       const purchaseGroups = {};
       
       transactions
-        .filter(t => t.card_id === cardId && 
-                     t.type === 'despesa' && 
-                     t.payment_method === 'credito')
+        .filter(t => {
+          if (t.card_id !== cardId || t.type !== 'despesa' || t.payment_method !== 'credito') {
+            return false;
+          }
+          
+          // Apenas transações que já chegaram
+          const tDate = new Date(t.date + 'T00:00:00');
+          return tDate <= today;
+        })
         .forEach(t => {
           const key = `${t.description}_${t.installments}_${t.amount}`;
           
@@ -1749,7 +1793,10 @@
           if (!t.description || !t.description.includes(paymentPattern)) {
             return false;
           }
-          return true;
+          
+          // Apenas pagamentos que já foram feitos
+          const tDate = new Date(t.date + 'T00:00:00');
+          return tDate <= today;
         })
         .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
@@ -1771,6 +1818,7 @@
 
       // Calcular fatura para os últimos 12 meses (e futuros próximos 12)
       const now = new Date();
+      now.setHours(0, 0, 0, 0);
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
 
@@ -1793,8 +1841,20 @@
               }
               
               const tDate = new Date(t.date + 'T00:00:00');
-              return tDate.getMonth() === checkDate.getMonth() && 
-                     tDate.getFullYear() === checkDate.getFullYear();
+              
+              // Verificar mês/ano
+              if (tDate.getMonth() !== checkDate.getMonth() || 
+                  tDate.getFullYear() !== checkDate.getFullYear()) {
+                return false;
+              }
+              
+              // Para o mês atual, considerar apenas transações que já chegaram
+              const isCurrentMonth = checkDate.getMonth() === currentMonth && checkDate.getFullYear() === currentYear;
+              if (isCurrentMonth && tDate > now) {
+                return false;
+              }
+              
+              return true;
             })
             .reduce((sum, t) => sum + parseFloat(t.amount), 0);
 
@@ -1804,13 +1864,17 @@
           const isCurrentMonth = checkDate.getMonth() === currentMonth && checkDate.getFullYear() === currentYear;
           
           if (isCurrentMonth) {
-            // APENAS no mês atual, contar TODAS as recorrentes
+            // APENAS no mês atual, contar TODAS as recorrentes que já chegaram
             const projectedRecurrings = getProjectedRecurringTransactions(checkDate.getMonth(), checkDate.getFullYear());
             recurringAmount = projectedRecurrings
               .filter(t => {
-                return t.card_id === cardId && 
-                       t.type === 'despesa' && 
-                       t.payment_method === 'credito';
+                if (t.card_id !== cardId || t.type !== 'despesa' || t.payment_method !== 'credito') {
+                  return false;
+                }
+                
+                // Apenas recorrências que já chegaram
+                const tDate = new Date(t.date + 'T00:00:00');
+                return tDate <= now;
               })
               .reduce((sum, t) => sum + parseFloat(t.amount), 0);
           }
@@ -1832,6 +1896,7 @@
 
       const now = viewDate || new Date();
       const today = new Date(); // Sempre pega a data de hoje para comparar
+      today.setHours(0, 0, 0, 0);
       
       // Verificar se o mês sendo visualizado é o MÊS ATUAL
       const isCurrentMonth = now.getMonth() === today.getMonth() && 
@@ -1845,8 +1910,19 @@
           }
           
           const installmentDate = new Date(t.date + 'T00:00:00');
-          return installmentDate.getMonth() === now.getMonth() && 
-                 installmentDate.getFullYear() === now.getFullYear();
+          
+          // Verificar mês/ano
+          if (installmentDate.getMonth() !== now.getMonth() || 
+              installmentDate.getFullYear() !== now.getFullYear()) {
+            return false;
+          }
+          
+          // Se estamos no mês atual, considerar apenas transações que já chegaram
+          if (isCurrentMonth && installmentDate > today) {
+            return false;
+          }
+          
+          return true;
         })
         .reduce((sum, t) => sum + parseFloat(t.amount), 0);
       
@@ -1855,12 +1931,16 @@
       let recurringTransactions = 0;
       if (isCurrentMonth) {
         const projectedRecurrings = getProjectedRecurringTransactions(now.getMonth(), now.getFullYear());
-        // TODAS as recorrentes do mês atual
+        // TODAS as recorrentes do mês atual que já chegaram
         recurringTransactions = projectedRecurrings
           .filter(t => {
-            return t.card_id === cardId && 
-                   t.type === 'despesa' && 
-                   t.payment_method === 'credito';
+            if (t.card_id !== cardId || t.type !== 'despesa' || t.payment_method !== 'credito') {
+              return false;
+            }
+            
+            // Apenas recorrências que já chegaram
+            const tDate = new Date(t.date + 'T00:00:00');
+            return tDate <= today;
           })
           .reduce((sum, t) => sum + parseFloat(t.amount), 0);
       }
@@ -1898,11 +1978,16 @@
 
     function calculateDebitCardBalance(cardId) {
       const now = new Date();
+      now.setHours(0, 0, 0, 0);
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
       
-      // Transações reais do cartão
-      const cardTransactions = transactions.filter(t => t.card_id === cardId);
+      // Transações reais do cartão - apenas as que já chegaram na data
+      const cardTransactions = transactions.filter(t => {
+        if (t.card_id !== cardId) return false;
+        const tDate = new Date(t.date + 'T00:00:00');
+        return tDate <= now; // Apenas transações com data igual ou anterior a hoje
+      });
       
       const income = cardTransactions
         .filter(t => t.type === 'receita')
@@ -1915,14 +2000,18 @@
       let balance = income - expenses;
       
       // Adicionar recorrências projetadas do mês atual que usam este cartão
+      // Apenas aquelas que já chegaram na data (não são realmente projetadas)
       const projectedRecurrings = getProjectedRecurringTransactions(currentMonth, currentYear);
       
       projectedRecurrings.forEach(t => {
         if (t.card_id === cardId) {
-          if (t.type === 'receita') {
-            balance += parseFloat(t.amount);
-          } else if (t.type === 'despesa') {
-            balance -= parseFloat(t.amount);
+          const tDate = new Date(t.date + 'T00:00:00');
+          if (tDate <= now) { // Apenas se a data da transação já chegou
+            if (t.type === 'receita') {
+              balance += parseFloat(t.amount);
+            } else if (t.type === 'despesa') {
+              balance -= parseFloat(t.amount);
+            }
           }
         }
       });
